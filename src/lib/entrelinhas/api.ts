@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { acceptImage, markPace, pace, rejectText } from "@/lib/entrelinhas/guard";
+import { acceptAvatar, acceptImage, markPace, pace, rejectText } from "@/lib/entrelinhas/guard";
 import {
   INK_IDS,
   KIND_META,
@@ -96,6 +96,12 @@ type PostRow = {
   like_count: number;
   comment_count: number;
   liked_by_me: number;
+  avatar_data?: string | null;
+  saved_by_me?: number;
+  reposted_by_me?: number;
+  repost_count?: number;
+  reposter_name?: string | null;
+  reposter_handle?: string | null;
 };
 
 function mapPost(r: PostRow): PostCard {
@@ -120,6 +126,12 @@ function mapPost(r: PostRow): PostCard {
     likeCount: num(r.like_count),
     commentCount: num(r.comment_count),
     liked: num(r.liked_by_me) > 0,
+    saved: num(r.saved_by_me) > 0,
+    reposted: num(r.reposted_by_me) > 0,
+    repostCount: num(r.repost_count),
+    reposterName: r.reposter_name ? safeName(r.reposter_name) : "",
+    reposterHandle: r.reposter_handle ?? "",
+    avatarData: acceptAvatar(r.avatar_data ?? ""),
   };
   if (card.userId !== "casa" && rejectText(card.title, card.body, card.citedAuthor, card.songTitle, card.artist)) {
     card.title = "";
@@ -155,6 +167,7 @@ async function loadBundle(viewerId: string, userId: string) {
     ink_id: string;
     note_text: string;
     note_fresh: number;
+    avatar_data: string;
     followers: number;
     following: number;
     pages: number;
@@ -162,7 +175,7 @@ async function loadBundle(viewerId: string, userId: string) {
     blocked_by_me: number;
   }>`
     select
-      p.user_id, p.handle, p.display_name, p.pen_name, p.bio, p.mold_id, p.ink_id,
+      p.user_id, p.handle, p.display_name, p.pen_name, p.bio, p.mold_id, p.ink_id, p.avatar_data,
       case
         when p.note_text <> '' and p.note_updated_at > now() - interval '7 days'
         then p.note_text else ''
@@ -188,10 +201,15 @@ async function loadBundle(viewerId: string, userId: string) {
       p.id, p.user_id, p.kind, p.title, p.body, p.cited_author, p.song_title, p.artist,
       p.cover_data, p.mold_id, p.ink_id, p.align,
       to_char(p.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
-      pr.handle, pr.display_name, pr.pen_name,
+      pr.handle, pr.display_name, pr.pen_name, pr.avatar_data,
       (select count(*)::int from likes l where l.post_id = p.id) as like_count,
       (select count(*)::int from comments c where c.post_id = p.id) as comment_count,
-      (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${viewerId}) as liked_by_me
+      (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${viewerId}) as liked_by_me,
+      (select count(*)::int from saves s where s.post_id = p.id and s.user_id = ${viewerId}) as saved_by_me,
+      (select count(*)::int from reposts rp where rp.post_id = p.id and rp.user_id = ${viewerId}) as reposted_by_me,
+      (select count(*)::int from reposts rp where rp.post_id = p.id) as repost_count,
+      '' as reposter_name,
+      '' as reposter_handle
     from posts p
     join profiles pr on pr.user_id = p.user_id
     where p.user_id = ${userId}
@@ -216,6 +234,7 @@ async function loadBundle(viewerId: string, userId: string) {
     displayName: rejectText(row.display_name) ? "Retido" : row.display_name,
     penName: rejectText(row.pen_name) ? "" : row.pen_name,
     bio: rejectText(row.bio) ? "" : row.bio,
+    avatarData: acceptAvatar(row.avatar_data ?? ""),
     moldId: moldOf(row.mold_id),
     inkId: inkOf(row.ink_id),
     noteText: rejectText(row.note_text ?? "") ? "" : (row.note_text ?? ""),
@@ -334,50 +353,110 @@ export const listFeed = createServerFn({ method: "POST" })
     const me = context.userId;
     const pat = `%${data.q.replace(/[\\%_]/g, "")}%`;
     const posts = await sql<PostRow>`
-      select
-        p.id, p.user_id, p.kind, p.title, p.body, p.cited_author, p.song_title, p.artist,
-        p.cover_data, p.mold_id, p.ink_id, p.align,
-        to_char(p.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
-        pr.handle, pr.display_name, pr.pen_name,
-        (select count(*)::int from likes l where l.post_id = p.id) as like_count,
-        (select count(*)::int from comments c where c.post_id = p.id) as comment_count,
-        (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${me}) as liked_by_me
-      from posts p
-      join profiles pr on pr.user_id = p.user_id
-      where not exists (
-          select 1 from blocks b
-          where (b.blocker_id = ${me} and b.blocked_id = p.user_id)
-             or (b.blocker_id = p.user_id and b.blocked_id = ${me})
-        )
-        and not exists (
-          select 1 from reports r
-          where r.reporter_id = ${me} and r.target_type = 'post' and r.target_id = p.id
-        )
-        and (
-          p.user_id = ${me}
-          or (
-            select count(distinct r2.reporter_id)::int from reports r2
-            where r2.target_type = 'post' and r2.target_id = p.id
-          ) < 3
-        )
-        and (
-          ${data.mode} <> 'following'
-          or p.user_id = ${me}
-          or exists (
-            select 1 from follows f where f.follower_id = ${me} and f.following_id = p.user_id
+      select * from (
+        select
+          p.id, p.user_id, p.kind, p.title, p.body, p.cited_author, p.song_title, p.artist,
+          p.cover_data, p.mold_id, p.ink_id, p.align,
+          to_char(p.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+          pr.handle, pr.display_name, pr.pen_name, pr.avatar_data,
+          (select count(*)::int from likes l where l.post_id = p.id) as like_count,
+          (select count(*)::int from comments c where c.post_id = p.id) as comment_count,
+          (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${me}) as liked_by_me,
+          (select count(*)::int from saves s where s.post_id = p.id and s.user_id = ${me}) as saved_by_me,
+          (select count(*)::int from reposts rp where rp.post_id = p.id and rp.user_id = ${me}) as reposted_by_me,
+          (select count(*)::int from reposts rp where rp.post_id = p.id) as repost_count,
+          '' as reposter_name,
+          '' as reposter_handle,
+          p.created_at as sort_at
+        from posts p
+        join profiles pr on pr.user_id = p.user_id
+        where not exists (
+            select 1 from blocks b
+            where (b.blocker_id = ${me} and b.blocked_id = p.user_id)
+               or (b.blocker_id = p.user_id and b.blocked_id = ${me})
           )
-        )
-        and (
-          ${data.q} = ''
-          or p.body ilike ${pat}
-          or p.title ilike ${pat}
-          or p.artist ilike ${pat}
-          or p.song_title ilike ${pat}
-          or pr.display_name ilike ${pat}
-          or pr.handle ilike ${pat}
-          or pr.pen_name ilike ${pat}
-        )
-      order by p.created_at desc
+          and not exists (
+            select 1 from reports r
+            where r.reporter_id = ${me} and r.target_type = 'post' and r.target_id = p.id
+          )
+          and (
+            p.user_id = ${me}
+            or (
+              select count(distinct r2.reporter_id)::int from reports r2
+              where r2.target_type = 'post' and r2.target_id = p.id
+            ) < 3
+          )
+          and (
+            ${data.mode} <> 'following'
+            or p.user_id = ${me}
+            or exists (
+              select 1 from follows f where f.follower_id = ${me} and f.following_id = p.user_id
+            )
+          )
+          and (
+            ${data.q} = ''
+            or p.body ilike ${pat}
+            or p.title ilike ${pat}
+            or p.artist ilike ${pat}
+            or p.song_title ilike ${pat}
+            or pr.display_name ilike ${pat}
+            or pr.handle ilike ${pat}
+            or pr.pen_name ilike ${pat}
+          )
+        union all
+        select
+          p.id, p.user_id, p.kind, p.title, p.body, p.cited_author, p.song_title, p.artist,
+          p.cover_data, p.mold_id, p.ink_id, p.align,
+          to_char(r.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+          pr.handle, pr.display_name, pr.pen_name, pr.avatar_data,
+          (select count(*)::int from likes l where l.post_id = p.id) as like_count,
+          (select count(*)::int from comments c where c.post_id = p.id) as comment_count,
+          (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${me}) as liked_by_me,
+          (select count(*)::int from saves s where s.post_id = p.id and s.user_id = ${me}) as saved_by_me,
+          (select count(*)::int from reposts rp where rp.post_id = p.id and rp.user_id = ${me}) as reposted_by_me,
+          (select count(*)::int from reposts rp where rp.post_id = p.id) as repost_count,
+          prr.display_name as reposter_name,
+          prr.handle as reposter_handle,
+          r.created_at as sort_at
+        from reposts r
+        join posts p on p.id = r.post_id
+        join profiles pr on pr.user_id = p.user_id
+        join profiles prr on prr.user_id = r.user_id
+        where r.user_id <> p.user_id
+          and not exists (
+            select 1 from blocks b
+            where (b.blocker_id = ${me} and b.blocked_id = p.user_id)
+               or (b.blocker_id = p.user_id and b.blocked_id = ${me})
+               or (b.blocker_id = ${me} and b.blocked_id = r.user_id)
+               or (b.blocker_id = r.user_id and b.blocked_id = ${me})
+          )
+          and not exists (
+            select 1 from reports rp2
+            where rp2.reporter_id = ${me} and rp2.target_type = 'post' and rp2.target_id = p.id
+          )
+          and (
+            p.user_id = ${me}
+            or (
+              select count(distinct r2.reporter_id)::int from reports r2
+              where r2.target_type = 'post' and r2.target_id = p.id
+            ) < 3
+          )
+          and (
+            ${data.mode} <> 'following'
+            or r.user_id = ${me}
+            or exists (
+              select 1 from follows f where f.follower_id = ${me} and f.following_id = r.user_id
+            )
+          )
+          and (
+            ${data.q} = ''
+            or p.body ilike ${pat}
+            or p.title ilike ${pat}
+            or prr.handle ilike ${pat}
+            or pr.handle ilike ${pat}
+          )
+      ) feed
+      order by sort_at desc
       limit 40
     `;
     let people: Person[] = [];
@@ -533,6 +612,8 @@ export const deletePost = createServerFn({ method: "POST" })
     if (!owned.length) return err("Essa página não é sua.");
     await sql`delete from comments where post_id = ${data.id}`;
     await sql`delete from likes where post_id = ${data.id}`;
+    await sql`delete from saves where post_id = ${data.id}`;
+    await sql`delete from reposts where post_id = ${data.id}`;
     await sql`delete from reports where target_type = 'post' and target_id = ${data.id}`;
     await sql`delete from posts where id = ${data.id} and user_id = ${me}`;
     return { ok: true as const };
@@ -565,6 +646,153 @@ export const toggleLike = createServerFn({ method: "POST" })
     return { ok: true as const, liked: existing.length === 0, likeCount: num(count[0]?.n) };
   });
 
+export const toggleSave = createServerFn({ method: "POST" })
+  .validator((input: unknown) => ({ id: clip(asRecord(input).id, 80) }))
+  .middleware([authMiddleware])
+  .handler(async ({ context, data }) => {
+    if (!data.id) return err("Página inválida.");
+    const sql = await getSql();
+    const me = context.userId;
+    const post = await sql<{ user_id: string }>`select user_id from posts where id = ${data.id}`;
+    if (!post[0]) return err("Essa página sumiu.");
+    if (await isBlocked(me, post[0].user_id)) return err("Não dá pra guardar.");
+    const slow = await pace(sql, me, "save");
+    if (slow) return err(slow);
+    const existing = await sql<{ ok: number }>`
+      select 1 as ok from saves where post_id = ${data.id} and user_id = ${me}
+    `;
+    if (existing.length) {
+      await sql`delete from saves where post_id = ${data.id} and user_id = ${me}`;
+    } else {
+      await sql`insert into saves (post_id, user_id) values (${data.id}, ${me})`;
+    }
+    await markPace(sql, me, "save");
+    return { ok: true as const, saved: existing.length === 0 };
+  });
+
+export const toggleRepost = createServerFn({ method: "POST" })
+  .validator((input: unknown) => ({ id: clip(asRecord(input).id, 80) }))
+  .middleware([authMiddleware])
+  .handler(async ({ context, data }) => {
+    if (!data.id) return err("Página inválida.");
+    const sql = await getSql();
+    const me = context.userId;
+    const post = await sql<{ user_id: string }>`select user_id from posts where id = ${data.id}`;
+    if (!post[0]) return err("Essa página sumiu.");
+    if (post[0].user_id === me) return err("Essa página já é sua.");
+    if (await isBlocked(me, post[0].user_id)) return err("Não dá pra republicar.");
+    const slow = await pace(sql, me, "repost");
+    if (slow) return err(slow);
+    const existing = await sql<{ ok: number }>`
+      select 1 as ok from reposts where post_id = ${data.id} and user_id = ${me}
+    `;
+    if (existing.length) {
+      await sql`delete from reposts where post_id = ${data.id} and user_id = ${me}`;
+    } else {
+      await sql`insert into reposts (post_id, user_id) values (${data.id}, ${me})`;
+    }
+    const count = await sql<{ n: number }>`
+      select count(*)::int as n from reposts where post_id = ${data.id}
+    `;
+    await markPace(sql, me, "repost");
+    return { ok: true as const, reposted: existing.length === 0, repostCount: num(count[0]?.n) };
+  });
+
+export const setAvatar = createServerFn({ method: "POST" })
+  .validator((input: unknown) => ({ dataUrl: clip(asRecord(input).dataUrl, 60_000) }))
+  .middleware([authMiddleware])
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const me = context.userId;
+    const slow = await pace(sql, me, "avatar");
+    if (slow) return err(slow);
+    const image = data.dataUrl ? acceptAvatar(data.dataUrl) : "";
+    if (data.dataUrl && !image) return err("Essa foto não entra. Manda uma imagem pequena, de verdade.");
+    const prof = await sql<{ user_id: string }>`select user_id from profiles where user_id = ${me}`;
+    if (!prof.length) return err("Termina o cadastro antes do retrato.");
+    await sql`update profiles set avatar_data = ${image} where user_id = ${me}`;
+    await markPace(sql, me, "avatar");
+    return { ok: true as const, avatarData: image };
+  });
+
+export const listShelf = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const shelf = asRecord(input).shelf;
+    return { shelf: shelf === "liked" ? "liked" as const : "saved" as const };
+  })
+  .middleware([authMiddleware])
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const me = context.userId;
+    const rows = await sql<PostRow>`
+      select
+        p.id, p.user_id, p.kind, p.title, p.body, p.cited_author, p.song_title, p.artist,
+        p.cover_data, p.mold_id, p.ink_id, p.align,
+        to_char(p.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+        pr.handle, pr.display_name, pr.pen_name, pr.avatar_data,
+        (select count(*)::int from likes l where l.post_id = p.id) as like_count,
+        (select count(*)::int from comments c where c.post_id = p.id) as comment_count,
+        (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${me}) as liked_by_me,
+        (select count(*)::int from saves s where s.post_id = p.id and s.user_id = ${me}) as saved_by_me,
+        (select count(*)::int from reposts rp where rp.post_id = p.id and rp.user_id = ${me}) as reposted_by_me,
+        (select count(*)::int from reposts rp where rp.post_id = p.id) as repost_count,
+        '' as reposter_name,
+        '' as reposter_handle
+      from posts p
+      join profiles pr on pr.user_id = p.user_id
+      where (
+          ${data.shelf} = 'saved' and exists (
+            select 1 from saves s where s.post_id = p.id and s.user_id = ${me}
+          )
+        ) or (
+          ${data.shelf} = 'liked' and exists (
+            select 1 from likes l where l.post_id = p.id and l.user_id = ${me}
+          )
+        )
+      order by p.created_at desc
+      limit 40
+    `;
+    return rows.map(mapPost);
+  });
+
+export const versoDoDia = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const me = context.userId;
+    const rows = await sql<{ id: string; body: string; pen_name: string; handle: string }>`
+      select p.id, p.body, pr.pen_name, pr.handle
+      from posts p
+      join profiles pr on pr.user_id = p.user_id
+      where p.kind in ('frase', 'nota')
+        and char_length(p.body) between 12 and 160
+        and not exists (
+          select 1 from blocks b
+          where (b.blocker_id = ${me} and b.blocked_id = p.user_id)
+             or (b.blocker_id = p.user_id and b.blocked_id = ${me})
+        )
+        and (
+          p.user_id = ${me}
+          or (
+            select count(distinct r2.reporter_id)::int from reports r2
+            where r2.target_type = 'post' and r2.target_id = p.id
+          ) < 3
+        )
+      order by p.created_at desc
+      limit 24
+    `;
+    const clean = rows.filter((row) => !rejectText(row.body));
+    if (!clean.length) return null;
+    const day = Math.floor(Date.now() / 86_400_000);
+    const row = clean[day % clean.length];
+    return {
+      id: row.id,
+      body: row.body,
+      name: rejectText(row.pen_name) ? row.handle : row.pen_name,
+      handle: row.handle,
+    };
+  });
+
 export const getPost = createServerFn({ method: "GET" })
   .validator((input: unknown) => ({ id: clip(asRecord(input).id, 80) }))
   .middleware([authMiddleware])
@@ -576,10 +804,15 @@ export const getPost = createServerFn({ method: "GET" })
         p.id, p.user_id, p.kind, p.title, p.body, p.cited_author, p.song_title, p.artist,
         p.cover_data, p.mold_id, p.ink_id, p.align,
         to_char(p.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
-        pr.handle, pr.display_name, pr.pen_name,
+        pr.handle, pr.display_name, pr.pen_name, pr.avatar_data,
         (select count(*)::int from likes l where l.post_id = p.id) as like_count,
         (select count(*)::int from comments c where c.post_id = p.id) as comment_count,
-        (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${me}) as liked_by_me
+        (select count(*)::int from likes l where l.post_id = p.id and l.user_id = ${me}) as liked_by_me,
+        (select count(*)::int from saves s where s.post_id = p.id and s.user_id = ${me}) as saved_by_me,
+        (select count(*)::int from reposts rp where rp.post_id = p.id and rp.user_id = ${me}) as reposted_by_me,
+        (select count(*)::int from reposts rp where rp.post_id = p.id) as repost_count,
+        '' as reposter_name,
+        '' as reposter_handle
       from posts p
       join profiles pr on pr.user_id = p.user_id
       where p.id = ${data.id}
@@ -714,9 +947,10 @@ export const listStoryTray = createServerFn({ method: "GET" })
       display_name: string;
       pen_name: string;
       mold_id: string;
+      avatar_data: string;
       note_text: string;
     }>`
-      select p.user_id, p.handle, p.display_name, p.pen_name, p.mold_id,
+      select p.user_id, p.handle, p.display_name, p.pen_name, p.mold_id, p.avatar_data,
         case
           when p.note_text <> '' and p.note_updated_at > now() - interval '7 days'
           then p.note_text else ''
@@ -787,6 +1021,7 @@ export const listStoryTray = createServerFn({ method: "GET" })
       displayName: safeName(p.display_name),
       penName: rejectText(p.pen_name) ? "" : p.pen_name,
       moldId: moldOf(p.mold_id),
+      avatarData: acceptAvatar(p.avatar_data ?? ""),
       note: p.note_text ?? "",
       stories: byUser.get(p.user_id) ?? [],
     }));

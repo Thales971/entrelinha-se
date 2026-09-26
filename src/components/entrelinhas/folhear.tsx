@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Heart, MessageCircle } from "lucide-react";
+import { Heart } from "lucide-react";
 import { listFeed, toggleLike } from "@/lib/entrelinhas/api";
 import type { PostCard } from "@/lib/entrelinhas/model";
-import { BookPage, cx } from "@/components/entrelinhas/book-page";
+import { BookPage } from "@/components/entrelinhas/book-page";
 import { useDesk } from "@/components/entrelinhas/desk";
-import { downloadPage } from "@/lib/entrelinhas/export-page";
+import { PageActions } from "@/components/entrelinhas/feed";
 
 function shortEnough(post: PostCard) {
   return post.kind === "frase" || post.kind === "nota" || post.kind === "musica" || post.body.length <= 420;
@@ -50,7 +50,7 @@ export function Folhear() {
     <div className="folhear no-scrollbar">
       {posts.map((post) => (
         <section
-          key={post.id}
+          key={`${post.id}-${post.reposterHandle || "origem"}`}
           className="folhear-slide flex items-stretch px-3 py-3"
           onClick={() => {
             const now = Date.now();
@@ -63,16 +63,8 @@ export function Folhear() {
               <BookPage post={post} />
             </div>
           </div>
-          <div className="absolute bottom-8 right-3 flex flex-col gap-3">
-            <button type="button" className="rail-btn" aria-label="Curtir" onClick={(e) => { e.stopPropagation(); void like(post); }}>
-              <Heart className={cx("size-5", post.liked && "fill-seal text-seal")} />
-            </button>
-            <button type="button" className="rail-btn" aria-label="Comentários" onClick={(e) => { e.stopPropagation(); desk.openPost(post.id); }}>
-              <MessageCircle className="size-5" />
-            </button>
-            <button type="button" className="rail-btn" aria-label="Guardar imagem" onClick={(e) => { e.stopPropagation(); void downloadPage(post); }}>
-              <Download className="size-5" />
-            </button>
+          <div className="absolute bottom-8 right-3" onClick={(e) => e.stopPropagation()}>
+            <PageActions post={post} layout="rail" />
           </div>
           {burst === post.id ? <Heart className="pop-heart size-24 fill-seal" /> : null}
         </section>

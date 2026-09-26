@@ -68,6 +68,12 @@ export type PostCard = {
   likeCount: number;
   commentCount: number;
   liked: boolean;
+  saved: boolean;
+  reposted: boolean;
+  repostCount: number;
+  reposterName: string;
+  reposterHandle: string;
+  avatarData: string;
 };
 
 export type Profile = {
@@ -76,6 +82,7 @@ export type Profile = {
   displayName: string;
   penName: string;
   bio: string;
+  avatarData: string;
   moldId: MoldId;
   inkId: InkId;
   noteText: string;
@@ -112,6 +119,7 @@ export type TrayPerson = {
   displayName: string;
   penName: string;
   moldId: MoldId;
+  avatarData: string;
   note: string;
   stories: StoryItem[];
 };

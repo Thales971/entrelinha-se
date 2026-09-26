@@ -1,20 +1,30 @@
 import { useEffect, useState } from "react";
-import { Download, Heart, MessageCircle, Plus, Search } from "lucide-react";
-import { listFeed, listStoryTray, toggleLike } from "@/lib/entrelinhas/api";
+import { Bookmark, Download, Heart, MessageCircle, Plus, Repeat2, Search } from "lucide-react";
+import { listFeed, listStoryTray, toggleLike, toggleRepost, toggleSave } from "@/lib/entrelinhas/api";
 import { ago, type PostCard, type TrayPerson } from "@/lib/entrelinhas/model";
-import { BookPage, Monogram, cx } from "@/components/entrelinhas/book-page";
+import { BookPage, Portrait, cx } from "@/components/entrelinhas/book-page";
 import { useDesk } from "@/components/entrelinhas/desk";
 import { downloadPage } from "@/lib/entrelinhas/export-page";
 
-function LikeControl({ post }: { post: PostCard }) {
+export function PageActions({ post, layout = "row", tone = "paper" }: { post: PostCard; layout?: "row" | "rail"; tone?: "paper" | "ink" }) {
   const [liked, setLiked] = useState(post.liked);
   const [count, setCount] = useState(post.likeCount);
+  const [saved, setSaved] = useState(post.saved);
+  const [reposted, setReposted] = useState(post.reposted);
+  const [reposts, setReposts] = useState(post.repostCount);
+  const [note, setNote] = useState("");
+  const desk = useDesk();
+  const mine = post.userId === desk.meId;
+
   useEffect(() => {
     setLiked(post.liked);
     setCount(post.likeCount);
-  }, [post.id, post.liked, post.likeCount]);
+    setSaved(post.saved);
+    setReposted(post.reposted);
+    setReposts(post.repostCount);
+  }, [post.id, post.liked, post.likeCount, post.saved, post.reposted, post.repostCount, post.reposterHandle]);
 
-  async function toggle() {
+  async function like() {
     const next = !liked;
     setLiked(next);
     setCount((c) => Math.max(0, c + (next ? 1 : -1)));
@@ -22,18 +32,79 @@ function LikeControl({ post }: { post: PostCard }) {
     if (!res.ok) {
       setLiked(!next);
       setCount((c) => Math.max(0, c + (next ? -1 : 1)));
+      setNote(res.error);
       return;
     }
     setLiked(res.liked);
     setCount(res.likeCount);
+    setNote("");
     if (next && navigator.vibrate) navigator.vibrate(12);
   }
 
+  async function save() {
+    const next = !saved;
+    setSaved(next);
+    const res = await toggleSave({ data: { id: post.id } });
+    if (!res.ok) {
+      setSaved(!next);
+      setNote(res.error);
+      return;
+    }
+    setSaved(res.saved);
+    setNote(res.saved ? "Na fita." : "");
+  }
+
+  async function repost() {
+    const next = !reposted;
+    setReposted(next);
+    setReposts((c) => Math.max(0, c + (next ? 1 : -1)));
+    const res = await toggleRepost({ data: { id: post.id } });
+    if (!res.ok) {
+      setReposted(!next);
+      setReposts((c) => Math.max(0, c + (next ? -1 : 1)));
+      setNote(res.error);
+      return;
+    }
+    setReposted(res.reposted);
+    setReposts(res.repostCount);
+    setNote(res.reposted ? "Repassada." : "");
+  }
+
+  const item = layout === "rail" ? "rail-btn" : `tap flex min-h-11 items-center gap-1 px-1 ${tone === "ink" ? "text-ink" : "text-paper"}`;
   return (
-    <button type="button" className="tap flex min-h-11 items-center gap-1 px-1 text-paper" onClick={() => void toggle()} aria-pressed={liked}>
-      <Heart className={cx("size-6", liked && "fill-seal text-seal")} />
-      <span className="tabular-nums text-sm">{count}</span>
-    </button>
+    <div className={layout === "rail" ? "flex flex-col gap-3" : "mt-2"}>
+      <div className={layout === "rail" ? "flex flex-col gap-3" : "flex items-center gap-1"}>
+        <button type="button" className={item} onClick={() => void like()} aria-pressed={liked} aria-label="Curtir">
+          <Heart className={cx("size-5", liked && "fill-seal text-seal")} />
+          {layout === "row" ? <span className="tabular-nums text-sm">{count}</span> : null}
+        </button>
+        <button type="button" className={item} onClick={() => void save()} aria-pressed={saved} aria-label="Guardar na fita">
+          <Bookmark className={cx("size-5", saved && "fill-seal text-seal")} />
+        </button>
+        {mine ? null : (
+          <button type="button" className={item} onClick={() => void repost()} aria-pressed={reposted} aria-label="Republicar">
+            <Repeat2 className={cx("size-5", reposted && "text-seal")} />
+            {layout === "row" ? <span className="tabular-nums text-sm">{reposts}</span> : null}
+          </button>
+        )}
+        {layout === "rail" ? (
+          <button type="button" className={item} aria-label="Comentários" onClick={() => desk.openPost(post.id)}>
+            <MessageCircle className="size-5" />
+          </button>
+        ) : null}
+        {layout === "rail" ? (
+          <button type="button" className={item} aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
+            <Download className="size-5" />
+          </button>
+        ) : null}
+        {layout === "row" ? (
+          <button type="button" className={`tap grid size-11 place-items-center ${tone === "ink" ? "text-ink" : "text-paper"}`} aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
+            <Download className="size-5" />
+          </button>
+        ) : null}
+      </div>
+      {note ? <p className={cx("text-xs", layout === "rail" ? "sr-only" : "px-1 text-paper/80")}>{note}</p> : null}
+    </div>
   );
 }
 
@@ -50,7 +121,13 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
         {mine?.note ? <span className="note-chip">{mine.note}</span> : null}
         <span className={cx("story-ring", mine?.stories.some((s) => !s.seen) && "story-ring-new")}>
           <span className="story-face">
-            {mine?.stories.length ? (mine.penName || mine.displayName).charAt(0).toUpperCase() : <Plus className="size-5" />}
+            {mine?.avatarData ? (
+              <Portrait name={mine.penName || mine.displayName} src={mine.avatarData} className="size-full" />
+            ) : mine?.stories.length ? (
+              (mine.penName || mine.displayName).charAt(0).toUpperCase()
+            ) : (
+              <Plus className="size-5" />
+            )}
           </span>
         </span>
         <span className="mt-1 text-xs text-paper">Sua</span>
@@ -68,7 +145,13 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
           >
             {person.note ? <span className="note-chip">{person.note}</span> : null}
             <span className={cx("story-ring", unseen && "story-ring-new")}>
-              <span className="story-face">{(person.penName || person.displayName).charAt(0).toUpperCase()}</span>
+              <span className="story-face">
+                {person.avatarData ? (
+                  <Portrait name={person.penName || person.displayName} src={person.avatarData} className="size-full" />
+                ) : (
+                  (person.penName || person.displayName).charAt(0).toUpperCase()
+                )}
+              </span>
             </span>
             <span className="mt-1 max-w-16 truncate text-xs text-paper">{person.handle}</span>
           </button>
@@ -82,8 +165,11 @@ export function PostCardView({ post }: { post: PostCard }) {
   const desk = useDesk();
   return (
     <article className="page-in px-4 pb-6">
+      {post.reposterHandle ? (
+        <p className="mb-1 text-xs text-paper/75">Repassada por @{post.reposterHandle}</p>
+      ) : null}
       <button type="button" className="mb-2 flex min-h-11 w-full items-center gap-2 text-left text-paper" onClick={() => desk.openUser(post.userId)}>
-        <Monogram name={post.penName || post.displayName} />
+        <Portrait name={post.penName || post.displayName} src={post.avatarData} />
         <span className="min-w-0">
           <span className="block truncate font-semibold">{post.penName || post.displayName}</span>
           <span className="block text-xs text-paper/70">@{post.handle} · {ago(post.createdAt)}</span>
@@ -92,14 +178,11 @@ export function PostCardView({ post }: { post: PostCard }) {
       <button type="button" className="block w-full text-left" onClick={() => desk.openPost(post.id)}>
         <BookPage post={post} />
       </button>
-      <div className="mt-2 flex items-center gap-1">
-        <LikeControl post={post} />
+      <div className="flex items-center">
+        <PageActions post={post} />
         <button type="button" className="tap flex min-h-11 items-center gap-1 px-2 text-paper" onClick={() => desk.openPost(post.id)}>
-          <MessageCircle className="size-6" />
+          <MessageCircle className="size-5" />
           <span className="tabular-nums text-sm">{post.commentCount}</span>
-        </button>
-        <button type="button" className="tap grid size-11 place-items-center text-paper" aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
-          <Download className="size-5" />
         </button>
       </div>
     </article>
@@ -156,7 +239,7 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
         <div className="space-y-1 px-4 pb-3">
           {people.map((person) => (
             <button key={person.userId} type="button" className="flex min-h-11 w-full items-center gap-2 text-left text-paper" onClick={() => desk.openUser(person.userId)}>
-              <Monogram name={person.displayName} />
+              <Portrait name={person.displayName} />
               <span>
                 <span className="block font-semibold">{person.displayName}</span>
                 <span className="text-xs text-paper/70">@{person.handle}</span>
@@ -174,7 +257,7 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
         </div>
       ) : null}
       {posts?.map((post) => (
-        <PostCardView key={post.id} post={post} />
+        <PostCardView key={`${post.id}-${post.reposterHandle || "origem"}`} post={post} />
       ))}
     </div>
   );

@@ -3,6 +3,7 @@ import { ChevronLeft, Trash2 } from "lucide-react";
 import { addComment, deleteComment, deletePost, getPost, reportContent, toggleBlock } from "@/lib/entrelinhas/api";
 import { REPORT_REASONS, formatWhen, type CommentItem, type PostCard, type ReportReason } from "@/lib/entrelinhas/model";
 import { BookPage } from "@/components/entrelinhas/book-page";
+import { PageActions } from "@/components/entrelinhas/feed";
 import { useDesk } from "@/components/entrelinhas/desk";
 
 export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) {
@@ -61,6 +62,9 @@ export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) 
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <BookPage post={post} />
+        <div className="ink-actions">
+          <PageActions post={post} tone="ink" />
+        </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {post.userId === desk.meId ? (
             <button

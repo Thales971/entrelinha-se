@@ -9,12 +9,18 @@ export function Monogram({ name, className }: { name: string; className?: string
   return <span className={cx("monogram", className)}>{letter}</span>;
 }
 
+export function Portrait({ name, src, className }: { name: string; src?: string; className?: string }) {
+  if (src) return <img className={cx("portrait", className || "size-10")} src={src} alt="" />;
+  return <Monogram name={name} className={className} />;
+}
+
 export function BookPage({ post, tight = false }: { post: PostCard; tight?: boolean }) {
   const signature = post.citedAuthor || post.penName || post.displayName;
   return (
     <div className={cx("book", `mold-${post.moldId}`, `ink-${post.inkId}`, tight && "scale-[0.98]")}>
       <div className="spine" aria-hidden="true" />
       <article className="page-sheet">
+        {post.saved ? <span className="ribbon" aria-hidden="true" /> : null}
         <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{KIND_META[post.kind].label}</p>
         {post.kind === "musica" && post.songTitle ? (
           <header className="mt-2">

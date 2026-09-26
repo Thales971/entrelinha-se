@@ -194,6 +194,9 @@ const PACE: Record<string, { limit: number; seconds: number; message: string }> 
   report: { limit: 12, seconds: 60 * 60, message: "Denúncias demais agora. Espera um pouco." },
   profile: { limit: 20, seconds: 60 * 60, message: "Você alterou o caderno rápido demais. Espera um pouco." },
   like: { limit: 60, seconds: 10 * 60, message: "Curtidas demais agora. Espera um instante." },
+  save: { limit: 40, seconds: 10 * 60, message: "Guardar em massa não passa. Espera um instante." },
+  repost: { limit: 12, seconds: 60 * 60, message: "Republicar em massa não passa. Espera um pouco." },
+  avatar: { limit: 8, seconds: 60 * 60, message: "Retrato demais agora. Espera um pouco." },
   chat: { limit: 15, seconds: 60 * 60, message: "Abrir conversa em massa não passa." },
 };
 
@@ -228,6 +231,12 @@ export function acceptImage(value: string): string {
   if (kind === "png" && !png) return "";
   if (kind === "webp" && !webp) return "";
   return value;
+}
+
+export function acceptAvatar(value: string): string {
+  const img = acceptImage(value);
+  if (!img || img.length > 48_000) return "";
+  return img;
 }
 
 export async function pace(sql: Sql, userId: string, kind: string): Promise<string | null> {

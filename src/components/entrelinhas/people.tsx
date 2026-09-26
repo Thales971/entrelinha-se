@@ -6,9 +6,11 @@ import {
   listConversations,
   listMessages,
   listPeople,
+  listShelf,
   openConversation,
   saveProfile,
   sendMessage,
+  setAvatar,
   toggleBlock,
   toggleFollow,
 } from "@/lib/entrelinhas/api";
@@ -22,7 +24,7 @@ import {
   type PostCard,
   type Profile,
 } from "@/lib/entrelinhas/model";
-import { BookPage, InkPicker, MoldPicker, Monogram } from "@/components/entrelinhas/book-page";
+import { BookPage, InkPicker, MoldPicker, Portrait } from "@/components/entrelinhas/book-page";
 import { useDesk } from "@/components/entrelinhas/desk";
 import { UserButton } from "@/lib/auth/gates";
 
@@ -30,6 +32,8 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
   const desk = useDesk();
   const [bundle, setBundle] = useState<{ profile: Profile; posts: PostCard[] } | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
+  const [shelf, setShelf] = useState<"pages" | "saved" | "liked">("pages");
+  const [kept, setKept] = useState<PostCard[]>([]);
   const [people, setPeople] = useState<Awaited<ReturnType<typeof listPeople>>>([]);
   const [blocked, setBlocked] = useState<{ userId: string; handle: string; displayName: string }[]>([]);
   const [error, setError] = useState("");
@@ -47,6 +51,11 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
       listBlocks().then(setBlocked).catch(() => undefined);
     }
   }, [userId, desk.tick]);
+
+  useEffect(() => {
+    if (userId !== desk.meId || shelf === "pages") return;
+    listShelf({ data: { shelf } }).then(setKept).catch(() => setKept([]));
+  }, [shelf, userId, desk.meId, desk.tick]);
 
   if (bundle === undefined) return <p className="px-5 py-10 font-serif text-2xl text-paper">Abrindo o caderno…</p>;
   if (!bundle) {
@@ -66,21 +75,23 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
           <ChevronLeft />
         </button>
       ) : null}
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <div>
-          <p className="font-serif text-4xl leading-none">{profile.penName || profile.displayName}</p>
-          <p className="mt-2 text-sm text-paper/75">@{profile.handle}</p>
+      <div className="profile-plate">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="font-serif text-4xl leading-none">{profile.penName || profile.displayName}</p>
+            <p className="mt-2 text-sm text-ink-soft">@{profile.handle}</p>
+          </div>
+          <Portrait name={profile.penName || profile.displayName} src={profile.avatarData} className="size-16 text-2xl" />
         </div>
-        <Monogram name={profile.penName || profile.displayName} className="size-14 text-2xl" />
-      </div>
-      {profile.bio ? <p className="mt-3 font-serif text-lg">{profile.bio}</p> : null}
-      {profile.noteFresh && profile.noteText ? (
-        <p className="mt-3 inline-block rounded-2xl bg-paper px-3 py-2 font-serif text-sm text-ink">Nota: {profile.noteText}</p>
-      ) : null}
-      <div className="mt-4 flex gap-4 text-sm">
-        <span><b className="tabular-nums">{profile.pages}</b> páginas</span>
-        <span><b className="tabular-nums">{profile.followers}</b> leitores</span>
-        <span><b className="tabular-nums">{profile.following}</b> seguindo</span>
+        <p className="mt-3 font-serif text-lg">{profile.bio || (profile.isMe ? "Ainda sem descrição. O caderno está em branco." : "")}</p>
+        {profile.noteFresh && profile.noteText ? (
+          <p className="mt-3 inline-block rounded-2xl bg-paper-deep px-3 py-2 font-serif text-sm">Nota: {profile.noteText}</p>
+        ) : null}
+        <div className="mt-4 flex gap-4 text-sm">
+          <span><b className="tabular-nums">{profile.pages}</b> páginas</span>
+          <span><b className="tabular-nums">{profile.followers}</b> leitores</span>
+          <span><b className="tabular-nums">{profile.following}</b> seguindo</span>
+        </div>
       </div>
       <div className="mt-4 flex gap-2">
         {profile.isMe ? (
@@ -127,12 +138,26 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
       {editing && profile.isMe ? (
         <Editor profile={profile} onSaved={() => { setEditing(false); load(); desk.refresh(); }} />
       ) : null}
-      <div className="mt-6 space-y-5">
-        {posts.map((post) => (
+      <div className="mt-5 flex gap-4 border-b border-paper/20">
+        <button type="button" className={shelf === "pages" ? "shelf-tab on text-paper" : "shelf-tab text-paper/70"} onClick={() => setShelf("pages")}>Páginas</button>
+        {profile.isMe ? (
+          <>
+            <button type="button" className={shelf === "saved" ? "shelf-tab on text-paper" : "shelf-tab text-paper/70"} onClick={() => setShelf("saved")}>Fita</button>
+            <button type="button" className={shelf === "liked" ? "shelf-tab on text-paper" : "shelf-tab text-paper/70"} onClick={() => setShelf("liked")}>Curtidas</button>
+          </>
+        ) : null}
+      </div>
+      <div className="mt-4 space-y-5">
+        {(shelf === "pages" ? posts : kept).map((post) => (
           <button key={post.id} type="button" className="block w-full text-left" onClick={() => desk.openPost(post.id)}>
             <BookPage post={post} />
           </button>
         ))}
+        {(shelf === "pages" ? posts : kept).length === 0 ? (
+          <p className="font-serif text-xl text-paper/80">
+            {shelf === "saved" ? "A fita ainda está vazia." : shelf === "liked" ? "Nenhuma curtida ainda." : "Nenhuma página ainda."}
+          </p>
+        ) : null}
       </div>
       {profile.isMe ? (
         <section className="mt-8">
@@ -186,6 +211,81 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
   );
 }
 
+function PortraitField({ current }: { current: string }) {
+  const desk = useDesk();
+  const [preview, setPreview] = useState(current);
+  const [error, setError] = useState("");
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 4_000_000) {
+      setError("Manda uma foto de até 4 MB.");
+      return;
+    }
+    const bmp = await createImageBitmap(file).catch(() => null);
+    if (!bmp) {
+      setError("Não consegui ler essa imagem.");
+      return;
+    }
+    const size = 96;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const scale = Math.max(size / bmp.width, size / bmp.height);
+    const w = bmp.width * scale;
+    const h = bmp.height * scale;
+    ctx.drawImage(bmp, (size - w) / 2, (size - h) / 2, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+    const res = await setAvatar({ data: { dataUrl } });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setPreview(res.avatarData);
+    setError("");
+    desk.refresh();
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <Portrait name="Eu" src={preview} className="size-14 text-xl" />
+      <div>
+        <label className="paper-btn inline-flex cursor-pointer items-center">
+          Retrato
+          <input
+            className="sr-only"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => void pick(e.target.files?.[0])}
+          />
+        </label>
+        {preview ? (
+          <button
+            type="button"
+            className="ghost-btn ml-1"
+            onClick={() => {
+              void setAvatar({ data: { dataUrl: "" } }).then((res) => {
+                if (!res.ok) {
+                  setError(res.error);
+                  return;
+                }
+                setPreview("");
+                desk.refresh();
+              });
+            }}
+          >
+            Tirar
+          </button>
+        ) : null}
+        <p className="mt-1 text-xs text-ink-soft">Só entra foto de verdade, pequena. Sem link e sem arquivo estranho.</p>
+        {error ? <p className="text-sm text-seal">{error}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function Editor({ profile, onSaved }: { profile: Profile; onSaved: () => void }) {
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [penName, setPenName] = useState(profile.penName);
@@ -218,7 +318,11 @@ function Editor({ profile, onSaved }: { profile: Profile; onSaved: () => void })
       <input className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nome" />
       <input className="field" value={penName} onChange={(e) => setPenName(e.target.value)} placeholder="Nome de pena" />
       <input className="field" value={handle} onChange={(e) => setHandle(slugHandle(e.target.value))} placeholder="usuario" />
-      <textarea className="field" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio curta" />
+      <label className="block text-sm">
+        Descrição do caderno
+        <textarea className="field mt-1" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Uma linha sobre você" maxLength={180} />
+      </label>
+      <PortraitField current={profile.avatarData} />
       <input className="field" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Nota no topo, fica uma semana" maxLength={80} />
       <MoldPicker value={moldId} onChange={setMoldId} />
       <InkPicker value={inkId} onChange={setInkId} />
@@ -245,7 +349,7 @@ export function ChatList() {
           {rows.map((row) => (
             <li key={row.id}>
               <button type="button" className="flex min-h-14 w-full items-center gap-3 text-left" onClick={() => desk.openChat(row.id, row.penName || row.displayName)}>
-                <Monogram name={row.penName || row.displayName} />
+                <Portrait name={row.penName || row.displayName} />
                 <span className="min-w-0">
                   <span className="block font-semibold">{row.penName || row.displayName}</span>
                   <span className="block truncate text-sm text-paper/70">{row.lastBody || "Conversa aberta"}</span>

@@ -129,7 +129,7 @@ async function createPgliteSql(): Promise<Sql> {
   });
   const pg = await globalRef.__pgliteInstance__;
 
-  // migrations/*.sql is the schema, including 0003_safety.sql. Reloading this
+  // migrations/*.sql is the schema, including 0004_shelf.sql. Reloading this
   // module picks up a new file and applies it once.
   // SQL is inlined by the bundler via import.meta.glob (no runtime fs); applied
   // files are tracked in _migrations. The glob does not descend, so the opt-in

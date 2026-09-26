@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Layers, Mail, Plus, UserRound } from "lucide-react";
 import type { AppUser } from "@/lib/auth/use-current-user";
-import { getMe } from "@/lib/entrelinhas/api";
+import { getMe, versoDoDia } from "@/lib/entrelinhas/api";
 import type { PostKind } from "@/lib/entrelinhas/model";
 import { Boot } from "@/components/entrelinhas/login-panel";
 import { Onboarding } from "@/components/entrelinhas/onboarding";
@@ -26,6 +26,7 @@ export function Shell({ user }: { user: AppUser }) {
   const [bundle, setBundle] = useState<Awaited<ReturnType<typeof getMe>> | undefined>(undefined);
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>("inicio");
+  const [verso, setVerso] = useState<{ id: string; body: string; name: string } | null>(null);
   const [feedMode, setFeedMode] = useState<"all" | "following">("all");
   const [overlay, setOverlay] = useState<Overlay | null>(null);
 
@@ -38,6 +39,16 @@ export function Shell({ user }: { user: AppUser }) {
       live = false;
     };
   }, [tick, user.id]);
+
+  useEffect(() => {
+    let live = true;
+    versoDoDia()
+      .then((row) => live && setVerso(row))
+      .catch(() => live && setVerso(null));
+    return () => {
+      live = false;
+    };
+  }, [tick]);
 
   if (bundle === undefined) return <Boot />;
   if (!bundle) return <Onboarding user={user} onDone={() => setTick((n) => n + 1)} />;
@@ -70,6 +81,12 @@ export function Shell({ user }: { user: AppUser }) {
               </div>
             </div>
             <h1 className="mt-1 font-serif text-[2rem] leading-none tracking-tight">entrelinha-se</h1>
+            {verso ? (
+              <button type="button" className="verso-slip" onClick={() => setOverlay({ type: "post", id: verso.id })}>
+                <p>{verso.body}</p>
+                <span className="mt-1 block text-xs text-ink-soft">verso do dia · {verso.name}</span>
+              </button>
+            ) : null}
           </header>
         ) : null}
         <div className="min-h-0 flex-1">
