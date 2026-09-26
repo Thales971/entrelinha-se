@@ -3,6 +3,7 @@ import type { AppUser } from "@/lib/auth/use-current-user";
 import { saveProfile } from "@/lib/entrelinhas/api";
 import { MOLDS, slugHandle, type InkId, type MoldId } from "@/lib/entrelinhas/model";
 import { LangSwitch, useLang } from "@/lib/entrelinhas/i18n";
+import { Lamp } from "@/components/entrelinhas/lamp";
 import { InkPicker, MoldPicker } from "@/components/entrelinhas/book-page";
 
 export function Onboarding({ user, onDone }: { user: AppUser; onDone: () => void }) {
@@ -45,7 +46,10 @@ export function Onboarding({ user, onDone }: { user: AppUser; onDone: () => void
     <form onSubmit={submit} className="flex h-full flex-col overflow-y-auto bg-paper px-5 py-6 text-ink">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">{t("firstPage")}</p>
-        <LangSwitch ink />
+        <div className="flex items-center gap-2">
+          <Lamp onPaper />
+          <LangSwitch ink />
+        </div>
       </div>
       <h1 className="mt-1 font-serif text-4xl leading-none text-balance">{t("howSign")}</h1>
       <p className="mt-2 text-sm text-ink-soft">{t("signHint")}</p>

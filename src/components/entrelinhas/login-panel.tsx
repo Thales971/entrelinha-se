@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
 import { LangSwitch, say, useLang } from "@/lib/entrelinhas/i18n";
+import { Lamp } from "@/components/entrelinhas/lamp";
 
 const BEARER_KEY = "grok-auth.bearer-token";
 
@@ -62,7 +63,7 @@ export function Boot() {
 }
 
 export function LoginPanel() {
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const [mode, setMode] = useState<"in" | "up">("up");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -99,16 +100,19 @@ export function LoginPanel() {
         await authFetch("/api/auth/sign-in/email", { email: email.trim(), password });
       }
     } catch (err) {
-      setError(say(lang, err instanceof Error ? err.message : t("errEnter")));
+      setError(say(t, err instanceof Error ? err.message : t("errEnter")));
       setBusy(false);
     }
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-5 pb-8 pt-14 text-cream">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs tracking-[0.18em] uppercase text-cream/70">{t("pocket")}</p>
-        <LangSwitch />
+    <div className="flex h-full flex-col overflow-y-auto px-5 py-6 text-cream">
+      <div className="flex items-start justify-between gap-3">
+        <p className="pt-2 text-xs tracking-[0.18em] uppercase text-cream/70">{t("pocket")}</p>
+        <div className="flex items-center gap-2">
+          <Lamp />
+          <LangSwitch />
+        </div>
       </div>
       <div className="mt-4">
         <OpenBook />

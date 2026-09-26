@@ -51,7 +51,7 @@ export function Compose({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const meta = KIND_META[kind];
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const lines = body.split(/\r?\n/).filter((l) => l.trim()).length;
 
   async function publish() {
@@ -99,7 +99,7 @@ export function Compose({
                   if (item === "frase" || item === "nota") setAlign("center");
                 }}
               >
-                {kindLabel(lang, item)}
+                {kindLabel(t, item)}
               </button>
             ))}
           </div>

@@ -1,13 +1,39 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { translateLines } from "@/lib/entrelinhas/translate";
 
 export const LANGS = [
-  { id: "pt", label: "PT" },
-  { id: "en", label: "EN" },
-  { id: "es", label: "ES" },
-  { id: "fr", label: "FR" },
+  { id: "pt", label: "Português" },
+  { id: "en", label: "English" },
+  { id: "es", label: "Español" },
+  { id: "fr", label: "Français" },
+  { id: "de", label: "Deutsch" },
+  { id: "it", label: "Italiano" },
+  { id: "ja", label: "日本語" },
+  { id: "ko", label: "한국어" },
+  { id: "zh", label: "中文" },
+  { id: "ru", label: "Русский" },
+  { id: "ar", label: "العربية" },
+  { id: "hi", label: "हिन्दी" },
+  { id: "nl", label: "Nederlands" },
+  { id: "pl", label: "Polski" },
+  { id: "tr", label: "Türkçe" },
+  { id: "uk", label: "Українська" },
+  { id: "id", label: "Indonesia" },
+  { id: "vi", label: "Tiếng Việt" },
+  { id: "sv", label: "Svenska" },
+  { id: "ro", label: "Română" },
+  { id: "el", label: "Ελληνικά" },
+  { id: "he", label: "עברית" },
+  { id: "th", label: "ไทย" },
+  { id: "cs", label: "Čeština" },
+  { id: "da", label: "Dansk" },
+  { id: "fi", label: "Suomi" },
+  { id: "hu", label: "Magyar" },
+  { id: "nb", label: "Norsk" },
+  { id: "ca", label: "Català" },
 ] as const;
 
-export type Lang = (typeof LANGS)[number]["id"];
+export type Lang = string;
 
 const pt = {
   pocket: "um livro no bolso",
@@ -75,6 +101,18 @@ const pt = {
   noLetters: "Nenhuma conversa ainda. Abre um perfil e toca em Escrever.",
   letterOpen: "Conversa aberta",
   startLetter: "Começa a carta.",
+  sendLetter: "Mandar carta",
+  openLetter: "Abrir carta",
+  writeHere: "Escreve aqui e toca no lacre",
+  sent: "enviada",
+  translate: "Traduzir",
+  showOriginal: "Ver original",
+  translating: "Traduzindo…",
+  pickSomeone: "Pra quem vai a carta?",
+  letterHint: "Toca no nome. A carta abre com o campo embaixo pra escrever.",
+  otherLang: "Outro",
+  langFail: "Esse idioma não respondeu. Tenta de novo.",
+  noPeople: "Ainda não tem ninguém pra escrever.",
   firstPage: "primeira página",
   howSign: "Como você assina?",
   signHint: "Isso aparece embaixo do verso. O @ é o seu lugar na estante.",
@@ -172,6 +210,18 @@ const en: Record<keyof typeof pt, string> = {
   noLetters: "No conversation yet. Open a profile and tap Write.",
   letterOpen: "Conversation open",
   startLetter: "Start the letter.",
+  sendLetter: "Send a letter",
+  openLetter: "Open letter",
+  writeHere: "Write here and tap the seal",
+  sent: "sent",
+  translate: "Translate",
+  showOriginal: "See original",
+  translating: "Translating…",
+  pickSomeone: "Who gets the letter?",
+  letterHint: "Tap a name. The letter opens with the writing field below.",
+  otherLang: "Other",
+  langFail: "That language did not answer. Try again.",
+  noPeople: "There is nobody to write to yet.",
   firstPage: "first page",
   howSign: "How do you sign?",
   signHint: "This shows under the verse. The @ is your place on the shelf.",
@@ -269,6 +319,18 @@ const es: Record<keyof typeof pt, string> = {
   noLetters: "Ninguna conversación todavía. Abre un perfil y toca Escribir.",
   letterOpen: "Conversación abierta",
   startLetter: "Empieza la carta.",
+  sendLetter: "Mandar carta",
+  openLetter: "Abrir carta",
+  writeHere: "Escribe aquí y toca el sello",
+  sent: "enviada",
+  translate: "Traducir",
+  showOriginal: "Ver original",
+  translating: "Traduciendo…",
+  pickSomeone: "¿Para quién es la carta?",
+  letterHint: "Toca el nombre. La carta se abre con el campo abajo para escribir.",
+  otherLang: "Otro",
+  langFail: "Ese idioma no respondió. Inténtalo de nuevo.",
+  noPeople: "Todavía no hay nadie a quien escribir.",
   firstPage: "primera página",
   howSign: "¿Cómo firmas?",
   signHint: "Esto aparece debajo del verso. El @ es tu lugar en el estante.",
@@ -366,6 +428,18 @@ const fr: Record<keyof typeof pt, string> = {
   noLetters: "Aucune conversation. Ouvre un profil et touche Écrire.",
   letterOpen: "Conversation ouverte",
   startLetter: "Commence la lettre.",
+  sendLetter: "Envoyer une lettre",
+  openLetter: "Ouvrir la lettre",
+  writeHere: "Écris ici et touche le sceau",
+  sent: "envoyée",
+  translate: "Traduire",
+  showOriginal: "Voir l'original",
+  translating: "Traduction…",
+  pickSomeone: "Pour qui est la lettre ?",
+  letterHint: "Touche un nom. La lettre s'ouvre avec le champ en bas.",
+  otherLang: "Autre",
+  langFail: "Cette langue n'a pas répondu. Réessaie.",
+  noPeople: "Personne à qui écrire pour l'instant.",
   firstPage: "première page",
   howSign: "Comment signes-tu ?",
   signHint: "Ça apparaît sous le vers. Le @ est ta place sur l'étagère.",
@@ -398,6 +472,7 @@ const fr: Record<keyof typeof pt, string> = {
 };
 
 const copy = { pt, en, es, fr };
+type Builtin = keyof typeof copy;
 
 export type CopyKey = keyof typeof pt;
 
@@ -409,47 +484,124 @@ const known: Record<string, CopyKey> = {
   "Não deu pra entrar daqui. Tenta de novo.": "errEnter",
 };
 
-export function say(lang: Lang, message: string) {
-  const key = known[message];
-  return key ? copy[lang][key] : message;
+function isBuiltin(value: string): value is Builtin {
+  return value === "pt" || value === "en" || value === "es" || value === "fr";
 }
 
+function isCode(value: string) {
+  return /^[a-z]{2,3}$/.test(value);
+}
+
+export function say(t: (key: CopyKey) => string, message: string) {
+  const key = known[message];
+  return key ? t(key) : message;
+}
+
+type Pack = Partial<Record<CopyKey, string>>;
+
 type LangApi = {
-  lang: Lang;
-  setLang: (lang: Lang) => void;
+  lang: string;
+  busyLang: boolean;
+  langNote: string;
+  setLang: (lang: string) => void;
   t: (key: CopyKey) => string;
 };
 
 const LangContext = createContext<LangApi | null>(null);
-
-function isLang(value: string | null): value is Lang {
-  return value === "pt" || value === "en" || value === "es" || value === "fr";
-}
+const PACK_KEYS = Object.keys(pt) as CopyKey[];
 
 export function LangProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("pt");
+  const [lang, setLangState] = useState("pt");
+  const [extra, setExtra] = useState<Pack | null>(null);
+  const [busyLang, setBusyLang] = useState(false);
+  const [langNote, setLangNote] = useState("");
+
+  function remember(next: string, pack: Pack | null) {
+    setLangState(next);
+    setExtra(pack);
+    localStorage.setItem("entrelinha-lang", next);
+    document.documentElement.lang = next === "pt" ? "pt-BR" : next;
+  }
+
+  function loadPack(next: string) {
+    setBusyLang(true);
+    setLangNote("");
+    const cached = localStorage.getItem(`entrelinha-pack-${next}`);
+    if (cached) {
+      try {
+        setExtra(JSON.parse(cached) as Pack);
+      } catch {
+        setExtra(null);
+      }
+    }
+    void (async () => {
+      const texts = PACK_KEYS.map((key) => pt[key]);
+      const lines: string[] = [];
+      try {
+        for (let index = 0; index < texts.length; index += 30) {
+          const res = await translateLines({ data: { target: next, texts: texts.slice(index, index + 30) } });
+          if (!res.ok || res.lines.length !== Math.min(30, texts.length - index)) {
+            setLangNote(res.error || pt.langFail);
+            return;
+          }
+          lines.push(...res.lines);
+        }
+      } catch {
+        setLangNote(pt.langFail);
+        return;
+      } finally {
+        setBusyLang(false);
+      }
+      const pack: Pack = {};
+      PACK_KEYS.forEach((key, index) => {
+        pack[key] = lines[index] || pt[key];
+      });
+      setExtra(pack);
+      localStorage.setItem(`entrelinha-pack-${next}`, JSON.stringify(pack));
+      setLangNote("");
+    })();
+  }
+
+  function setLang(nextRaw: string) {
+    const next = nextRaw.toLowerCase().trim();
+    if (!isCode(next)) {
+      setLangNote(pt.langFail);
+      return;
+    }
+    if (isBuiltin(next)) {
+      setBusyLang(false);
+      setLangNote("");
+      remember(next, null);
+      return;
+    }
+    remember(next, null);
+    loadPack(next);
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem("entrelinha-lang");
-    if (isLang(saved)) {
-      setLangState(saved);
+    if (saved && isCode(saved)) {
+      if (isBuiltin(saved)) remember(saved, null);
+      else {
+        remember(saved, null);
+        loadPack(saved);
+      }
       return;
     }
-    const nav = navigator.language.toLowerCase();
-    if (nav.startsWith("en")) setLangState("en");
-    else if (nav.startsWith("es")) setLangState("es");
-    else if (nav.startsWith("fr")) setLangState("fr");
+    const nav = navigator.language.toLowerCase().slice(0, 2);
+    if (nav === "en" || nav === "es" || nav === "fr") remember(nav, null);
   }, []);
-
-  useEffect(() => {
-    document.documentElement.lang = lang === "pt" ? "pt-BR" : lang;
-    localStorage.setItem("entrelinha-lang", lang);
-  }, [lang]);
 
   const api: LangApi = {
     lang,
-    setLang: setLangState,
-    t: (key) => copy[lang][key],
+    busyLang,
+    langNote,
+    setLang,
+    t: (key) => {
+      if (!isBuiltin(lang) && extra?.[key]) return extra[key];
+      if (isBuiltin(lang)) return copy[lang][key];
+      return pt[key];
+    },
   };
 
   return <LangContext.Provider value={api}>{children}</LangContext.Provider>;
@@ -462,25 +614,48 @@ export function useLang() {
 }
 
 export function LangSwitch({ ink = false }: { ink?: boolean }) {
-  const { lang, setLang, t } = useLang();
+  const { lang, setLang, t, busyLang, langNote } = useLang();
+  const [code, setCode] = useState("");
+  const listed = LANGS.some((item) => item.id === lang);
   return (
-    <div className={ink ? "lang-switch on-ink" : "lang-switch"} role="group" aria-label={t("language")}>
-      {LANGS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={lang === item.id ? "on" : ""}
-          aria-pressed={lang === item.id}
-          onClick={() => setLang(item.id)}
-        >
-          {item.label}
-        </button>
-      ))}
+    <div className={ink ? "lang-box on-ink" : "lang-box"}>
+      <select
+        aria-label={t("language")}
+        value={listed ? lang : "other"}
+        onChange={(event) => {
+          if (event.target.value !== "other") setLang(event.target.value);
+        }}
+      >
+        {LANGS.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.label}
+          </option>
+        ))}
+        <option value="other">{listed ? t("otherLang") : lang}</option>
+      </select>
+      <form
+        className="flex"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setLang(code);
+        }}
+      >
+        <input
+          className="lang-code"
+          value={code}
+          maxLength={3}
+          placeholder="sw"
+          aria-label={t("otherLang")}
+          onChange={(event) => setCode(event.target.value.toLowerCase())}
+        />
+      </form>
+      {busyLang ? <span className="text-xs">{t("translating")}</span> : null}
+      {langNote ? <span className="text-xs">{langNote}</span> : null}
     </div>
   );
 }
 
-export function kindLabel(lang: Lang, kind: string) {
+export function kindLabel(t: (key: CopyKey) => string, kind: string) {
   const map: Record<string, CopyKey> = {
     poema: "kindPoem",
     frase: "kindPhrase",
@@ -489,5 +664,6 @@ export function kindLabel(lang: Lang, kind: string) {
     nota: "kindNote",
   };
   const key = map[kind];
-  return key ? copy[lang][key] : kind;
+  return key ? t(key) : kind;
 }
+

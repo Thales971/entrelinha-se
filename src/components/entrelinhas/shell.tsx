@@ -14,6 +14,7 @@ import { PostSheet } from "@/components/entrelinhas/post-sheet";
 import { ChatList, ChatThread, ProfileView } from "@/components/entrelinhas/people";
 import { cx } from "@/components/entrelinhas/book-page";
 import { useLang } from "@/lib/entrelinhas/i18n";
+import { Lamp } from "@/components/entrelinhas/lamp";
 
 type Tab = "inicio" | "folhear" | "conversas" | "eu";
 type Overlay =
@@ -70,16 +71,17 @@ export function Shell({ user }: { user: AppUser }) {
     <DeskProvider value={api}>
       <div className="relative flex h-full min-h-0 flex-col">
         {tab === "inicio" && !overlay ? (
-          <header className="topbar px-4 pb-3 pt-4 pr-16">
+          <header className="topbar px-4 pb-3 pt-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">{t("shelf")}</p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <button type="button" className={cx("chip-ink", feedMode === "all" && "on")} onClick={() => setFeedMode("all")}>
                   {t("all")}
                 </button>
                 <button type="button" className={cx("chip-ink", feedMode === "following" && "on")} onClick={() => setFeedMode("following")}>
                   {t("following")}
                 </button>
+                <Lamp />
               </div>
             </div>
             <h1 className="mt-1 font-serif text-[2rem] leading-none tracking-tight">entrelinha-se</h1>
@@ -90,6 +92,10 @@ export function Shell({ user }: { user: AppUser }) {
               </button>
             ) : null}
           </header>
+        ) : !overlay ? (
+          <div className="flex justify-end px-3 pt-3">
+            <Lamp />
+          </div>
         ) : null}
         <div className="min-h-0 flex-1">
           {tab === "inicio" ? <Feed mode={feedMode} /> : null}

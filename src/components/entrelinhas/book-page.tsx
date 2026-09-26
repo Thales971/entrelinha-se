@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { KIND_META, MOLDS, INKS, type InkId, type MoldId, type PostCard } from "@/lib/entrelinhas/model";
 import { kindLabel, useLang } from "@/lib/entrelinhas/i18n";
+import { translateLines } from "@/lib/entrelinhas/translate";
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -16,14 +18,14 @@ export function Portrait({ name, src, className }: { name: string; src?: string;
 }
 
 export function BookPage({ post, tight = false }: { post: PostCard; tight?: boolean }) {
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const signature = post.citedAuthor || post.penName || post.displayName;
   return (
     <div className={cx("book", `mold-${post.moldId}`, `ink-${post.inkId}`, tight && "scale-[0.98]")}>
       <div className="spine" aria-hidden="true" />
       <article className="page-sheet">
         {post.saved ? <span className="ribbon" aria-hidden="true" /> : null}
-        <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{kindLabel(lang, post.kind)}</p>
+        <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{kindLabel(t, post.kind)}</p>
         {post.kind === "musica" && post.songTitle ? (
           <header className="mt-2">
             <h3 className="font-serif text-xl leading-tight text-balance">{post.songTitle}</h3>
@@ -33,9 +35,7 @@ export function BookPage({ post, tight = false }: { post: PostCard; tight?: bool
           <h3 className="mt-2 font-serif text-xl leading-tight text-balance">{post.title}</h3>
         ) : null}
         <div className="ornament" aria-hidden="true" />
-        <p className={cx("verse", post.align === "center" ? "align-center" : "align-left", post.coverData && "verse-with-cover")}>
-          {post.body}
-        </p>
+        <Verse text={post.body} cover={Boolean(post.coverData)} align={post.align} target={lang} label={t("translate")} back={t("showOriginal")} />
         {post.coverData ? (
           <img className="cover-stamp" src={post.coverData} alt={`Foto enviada por @${post.handle}`} />
         ) : null}
@@ -47,6 +47,53 @@ export function BookPage({ post, tight = false }: { post: PostCard; tight?: bool
         </footer>
       </article>
     </div>
+  );
+}
+
+function Verse({
+  text,
+  cover,
+  align,
+  target,
+  label,
+  back,
+}: {
+  text: string;
+  cover: boolean;
+  align: string;
+  target: string;
+  label: string;
+  back: string;
+}) {
+  const [alt, setAlt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [fail, setFail] = useState(false);
+
+  async function go() {
+    if (alt) {
+      setAlt(null);
+      return;
+    }
+    setBusy(true);
+    setFail(false);
+    const res = await translateLines({ data: { target: target === "pt" ? "en" : target, texts: [text] } }).catch(() => null);
+    setBusy(false);
+    if (!res?.ok || !res.lines[0] || res.lines[0] === text) {
+      setFail(true);
+      return;
+    }
+    setAlt(res.lines[0]);
+  }
+
+  return (
+    <>
+      <p className={cx("verse", align === "center" ? "align-center" : "align-left", cover && "verse-with-cover")}>{alt ?? text}</p>
+      <button type="button" className="translate-btn" onClick={() => void go()}>
+        {busy ? "…" : alt ? back : label}
+        {target === "pt" && !alt ? " · EN" : ""}
+      </button>
+      {fail ? <p className="text-xs text-ink-soft">…</p> : null}
+    </>
   );
 }
 

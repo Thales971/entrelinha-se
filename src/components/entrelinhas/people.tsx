@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ChevronLeft, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, Mail, Send } from "lucide-react";
 import {
   getProfile,
   listBlocks,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/entrelinhas/model";
 import { BookPage, InkPicker, MoldPicker, Portrait } from "@/components/entrelinhas/book-page";
 import { LangSwitch, useLang } from "@/lib/entrelinhas/i18n";
+import { translateLines } from "@/lib/entrelinhas/translate";
 import { useDesk } from "@/components/entrelinhas/desk";
 import { UserButton } from "@/lib/auth/gates";
 
@@ -109,7 +110,7 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
             {!profile.isCasa ? (
               <button
                 type="button"
-                className="paper-btn"
+                className="seal-btn inline-flex flex-1 items-center justify-center gap-2"
                 onClick={() => {
                   void openConversation({ data: { userId: profile.userId } }).then((res) => {
                     if (!res.ok) {
@@ -120,7 +121,8 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
                   });
                 }}
               >
-                {t("write")}
+                <Mail className="size-4" />
+                {t("sendLetter")}
               </button>
             ) : null}
             {!profile.isCasa ? (
@@ -336,43 +338,93 @@ function Editor({ profile, onSaved }: { profile: Profile; onSaved: () => void })
   );
 }
 
+function clock(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function dayLabel(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString();
+}
+
 export function ChatList() {
   const desk = useDesk();
   const { t } = useLang();
   const [rows, setRows] = useState<ChatPreview[] | null>(null);
+  const [people, setPeople] = useState<Awaited<ReturnType<typeof listPeople>>>([]);
+  const [error, setError] = useState("");
+
   useEffect(() => {
     listConversations().then(setRows).catch(() => setRows([]));
+    listPeople().then(setPeople).catch(() => setPeople([]));
   }, [desk.tick]);
+
+  function writeTo(userId: string, name: string) {
+    setError("");
+    void openConversation({ data: { userId } }).then((res) => {
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      desk.openChat(res.id, name);
+    });
+  }
+
   if (!rows) return <p className="px-5 py-10 font-serif text-cream">{t("openingLetters")}</p>;
   return (
     <div className="h-full overflow-y-auto px-4 py-4 text-cream">
       <h2 className="font-serif text-4xl">{t("letters")}</h2>
-      {rows.length === 0 ? (
-        <p className="mt-3 text-cream/80">{t("noLetters")}</p>
-      ) : (
-        <ul className="mt-4 space-y-2">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <button type="button" className="flex min-h-14 w-full items-center gap-3 text-left" onClick={() => desk.openChat(row.id, row.penName || row.displayName)}>
-                <Portrait name={row.penName || row.displayName} />
-                <span className="min-w-0">
-                  <span className="block font-semibold">{row.penName || row.displayName}</span>
-                  <span className="block truncate text-sm text-cream/70">{row.lastBody || t("letterOpen")}</span>
+      <p className="mt-2 max-w-sm text-sm text-cream/75">{t("letterHint")}</p>
+      {rows.length === 0 ? <p className="mt-4 font-serif text-xl">{t("noLetters")}</p> : null}
+      <ul className="mt-4 space-y-2">
+        {rows.map((row) => (
+          <li key={row.id}>
+            <button type="button" className="letter-row" onClick={() => desk.openChat(row.id, row.penName || row.displayName)}>
+              <Portrait name={row.penName || row.displayName} />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="truncate font-semibold">{row.penName || row.displayName}</span>
+                  <span className="shrink-0 text-xs text-cream/60">{clock(row.lastAt)}</span>
                 </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <span className="mt-0.5 block truncate text-sm text-cream/70">{row.lastBody || t("letterOpen")}</span>
+              </span>
+              <span className="letter-open">{t("openLetter")}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <h3 className="mt-8 font-serif text-2xl">{t("pickSomeone")}</h3>
+      {people.length === 0 ? <p className="mt-2 text-sm text-cream/70">{t("noPeople")}</p> : null}
+      <ul className="mt-3 space-y-2">
+        {people.filter((person) => person.userId !== "casa").slice(0, 8).map((person) => (
+          <li key={person.userId}>
+            <button type="button" className="letter-row" onClick={() => writeTo(person.userId, person.penName || person.displayName)}>
+              <Portrait name={person.penName || person.displayName} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold">{person.penName || person.displayName}</span>
+                <span className="block text-xs text-cream/70">@{person.handle}</span>
+              </span>
+              <span className="letter-open seal">{t("sendLetter")}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error ? <p className="mt-3 text-sm">{error}</p> : null}
     </div>
   );
 }
 
 export function ChatThread({ conversationId, title, onClose }: { conversationId: string; title: string; onClose: () => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
+  const [freshId, setFreshId] = useState("");
+  const [alts, setAlts] = useState<Record<string, string>>({});
+  const end = useRef<HTMLDivElement>(null);
 
   function load() {
     listMessages({ data: { conversationId } }).then((res) => {
@@ -387,42 +439,97 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
     return () => window.clearInterval(timer);
   }, [conversationId]);
 
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
+
+  let lastDay = "";
+
   return (
-    <div className="sheet sheet-wood">
-      <header className="flex items-center gap-2 px-2 py-2">
-        <button type="button" className="grid size-11 place-items-center" aria-label="Voltar" onClick={onClose}>
+    <div className="sheet chat-sheet">
+      <header className="chat-head">
+        <button type="button" className="grid size-11 place-items-center" aria-label={t("back")} onClick={onClose}>
           <ChevronLeft />
         </button>
-        <h2 className="font-serif text-2xl">{title}</h2>
+        <Portrait name={title} />
+        <div className="min-w-0">
+          <h2 className="truncate font-serif text-xl leading-none">{title}</h2>
+          <p className="mt-1 text-xs text-cream/70">{t("letterOpen")}</p>
+        </div>
       </header>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
-        {messages.map((message) => (
-          <p key={message.id} className={message.mine ? "bubble-me" : "bubble-them"}>{message.body}</p>
-        ))}
-        {messages.length === 0 ? <p className="text-sm text-cream/70">{t("startLetter")}</p> : null}
+      <div className="chat-wall min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
+        {messages.length === 0 ? (
+          <div className="folded-letter">
+            <p className="font-serif text-2xl">{t("startLetter")}</p>
+            <p className="mt-1 text-sm">{t("letterHint")}</p>
+          </div>
+        ) : null}
+        {messages.map((message) => {
+          const day = dayLabel(message.createdAt);
+          const showDay = day !== lastDay;
+          lastDay = day;
+          return (
+            <div key={message.id}>
+              {showDay && day ? <p className="chat-day">{day}</p> : null}
+              <div className={message.mine ? "bubble-me" : "bubble-them"}>
+                {message.id === freshId ? <span className="wax-pop" aria-hidden="true" /> : null}
+                <p>{alts[message.id] || message.body}</p>
+                <span className="bubble-meta">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (alts[message.id]) {
+                        setAlts((prev) => {
+                          const next = { ...prev };
+                          delete next[message.id];
+                          return next;
+                        });
+                        return;
+                      }
+                      const target = lang === "pt" ? "en" : lang;
+                      void translateLines({ data: { target, texts: [message.body] } }).then((res) => {
+                        if (res.ok && res.lines[0] && res.lines[0] !== message.body) {
+                          setAlts((prev) => ({ ...prev, [message.id]: res.lines[0] }));
+                        }
+                      });
+                    }}
+                  >
+                    {alts[message.id] ? t("showOriginal") : t("translate")}
+                  </button>
+                  <span>{clock(message.createdAt)}</span>
+                  {message.mine ? <span>{t("sent")}</span> : null}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={end} />
       </div>
+      {error ? <p className="px-4 pt-2 text-sm text-cream">{error}</p> : null}
       <form
-        className="flex gap-2 p-3"
-        onSubmit={(e) => {
-          e.preventDefault();
+        className="chat-compose"
+        onSubmit={(event) => {
+          event.preventDefault();
           const body = text.trim();
           if (!body) return;
           setText("");
+          setError("");
           void sendMessage({ data: { conversationId, body } }).then((res) => {
             if (!res.ok) {
               setError(res.error);
+              setText(body);
               return;
             }
+            setFreshId(res.id);
             load();
           });
         }}
       >
-        <input className="field" placeholder="Escrever" value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="seal-fab shrink-0" type="submit" aria-label="Enviar">
+        <input className="field chat-input" placeholder={t("writeHere")} value={text} onChange={(event) => setText(event.target.value)} />
+        <button className="seal-fab shrink-0" type="submit" aria-label={t("sendLetter")}>
           <Send className="size-5" />
         </button>
       </form>
-      {error ? <p className="px-4 pb-3 text-sm text-cream">{error}</p> : null}
     </div>
   );
 }
