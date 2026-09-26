@@ -10,6 +10,7 @@ import {
   type Profile,
 } from "@/lib/entrelinhas/model";
 import { InkPicker, MoldPicker, cx } from "@/components/entrelinhas/book-page";
+import { kindLabel, useLang } from "@/lib/entrelinhas/i18n";
 
 async function fileToCover(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
@@ -50,6 +51,7 @@ export function Compose({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const meta = KIND_META[kind];
+  const { t, lang } = useLang();
   const lines = body.split(/\r?\n/).filter((l) => l.trim()).length;
 
   async function publish() {
@@ -82,7 +84,7 @@ export function Compose({
         <button type="button" className="tap grid size-11 place-items-center" onClick={onClose} aria-label="Fechar">
           <ChevronLeft />
         </button>
-        <h2 className="font-serif text-2xl">{mode === "story" ? "História" : "Nova página"}</h2>
+        <h2 className="font-serif text-2xl">{mode === "story" ? t("story") : t("newPage")}</h2>
       </header>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-8">
         {mode === "post" ? (
@@ -97,12 +99,12 @@ export function Compose({
                   if (item === "frase" || item === "nota") setAlign("center");
                 }}
               >
-                {KIND_META[item].label}
+                {kindLabel(lang, item)}
               </button>
             ))}
           </div>
         ) : null}
-        <p className="text-sm text-ink-soft">{mode === "story" ? "Some em 24 horas. Uma frase basta." : meta.hint}</p>
+        <p className="text-sm text-ink-soft">{mode === "story" ? t("storyHint") : meta.hint}</p>
         {mode === "post" && (kind === "poema" || kind === "reflexao") ? (
           <input className="field" placeholder="Título, se quiser" value={title} onChange={(e) => setTitle(e.target.value)} />
         ) : null}

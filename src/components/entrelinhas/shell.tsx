@@ -13,6 +13,7 @@ import { StoryViewer } from "@/components/entrelinhas/stories";
 import { PostSheet } from "@/components/entrelinhas/post-sheet";
 import { ChatList, ChatThread, ProfileView } from "@/components/entrelinhas/people";
 import { cx } from "@/components/entrelinhas/book-page";
+import { useLang } from "@/lib/entrelinhas/i18n";
 
 type Tab = "inicio" | "folhear" | "conversas" | "eu";
 type Overlay =
@@ -29,6 +30,7 @@ export function Shell({ user }: { user: AppUser }) {
   const [verso, setVerso] = useState<{ id: string; body: string; name: string } | null>(null);
   const [feedMode, setFeedMode] = useState<"all" | "following">("all");
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const { t } = useLang();
 
   useEffect(() => {
     let live = true;
@@ -70,13 +72,13 @@ export function Shell({ user }: { user: AppUser }) {
         {tab === "inicio" && !overlay ? (
           <header className="topbar px-4 pb-3 pt-4 pr-16">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">estante</p>
+              <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">{t("shelf")}</p>
               <div className="flex gap-2">
                 <button type="button" className={cx("chip-ink", feedMode === "all" && "on")} onClick={() => setFeedMode("all")}>
-                  Tudo
+                  {t("all")}
                 </button>
                 <button type="button" className={cx("chip-ink", feedMode === "following" && "on")} onClick={() => setFeedMode("following")}>
-                  Seguindo
+                  {t("following")}
                 </button>
               </div>
             </div>
@@ -84,7 +86,7 @@ export function Shell({ user }: { user: AppUser }) {
             {verso ? (
               <button type="button" className="verso-slip" onClick={() => setOverlay({ type: "post", id: verso.id })}>
                 <p>{verso.body}</p>
-                <span className="mt-1 block text-xs text-ink-soft">verso do dia · {verso.name}</span>
+                <span className="mt-1 block text-xs text-ink-soft">{t("dayVerse")} · {verso.name}</span>
               </button>
             ) : null}
           </header>
@@ -98,22 +100,22 @@ export function Shell({ user }: { user: AppUser }) {
         <nav className="nav-bar grid grid-cols-5 place-items-center px-2 pt-2">
           <button type="button" className={cx("nav-btn", tab === "inicio" && "on")} onClick={() => { setOverlay(null); setTab("inicio"); }}>
             <BookOpen className="size-5" />
-            Início
+            {t("navHome")}
           </button>
           <button type="button" className={cx("nav-btn", tab === "folhear" && "on")} onClick={() => { setOverlay(null); setTab("folhear"); }}>
             <Layers className="size-5" />
-            Folhear
+            {t("navFlip")}
           </button>
-          <button type="button" className="nav-btn" onClick={() => setOverlay({ type: "compose", mode: "post" })} aria-label="Nova página">
+          <button type="button" className="nav-btn" onClick={() => setOverlay({ type: "compose", mode: "post" })} aria-label={t("newPage")}>
             <span className="seal-fab"><Plus className="size-5" /></span>
           </button>
           <button type="button" className={cx("nav-btn", tab === "conversas" && "on")} onClick={() => { setOverlay(null); setTab("conversas"); }}>
             <Mail className="size-5" />
-            Cartas
+            {t("navLetters")}
           </button>
           <button type="button" className={cx("nav-btn", tab === "eu" && "on")} onClick={() => { setOverlay(null); setTab("eu"); }}>
             <UserRound className="size-5" />
-            Eu
+            {t("navMe")}
           </button>
         </nav>
         {overlay?.type === "compose" ? (

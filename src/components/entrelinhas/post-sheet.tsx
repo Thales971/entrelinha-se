@@ -5,9 +5,11 @@ import { REPORT_REASONS, formatWhen, type CommentItem, type PostCard, type Repor
 import { BookPage } from "@/components/entrelinhas/book-page";
 import { PageActions } from "@/components/entrelinhas/feed";
 import { useDesk } from "@/components/entrelinhas/desk";
+import { useLang } from "@/lib/entrelinhas/i18n";
 
 export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const desk = useDesk();
+  const { t } = useLang();
   const [post, setPost] = useState<PostCard | null | undefined>(undefined);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [text, setText] = useState("");
@@ -42,12 +44,12 @@ export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) 
     desk.refresh();
   }
 
-  if (post === undefined) return <div className="sheet items-center justify-center font-serif">Abrindo a página…</div>;
+  if (post === undefined) return <div className="sheet items-center justify-center font-serif">{t("openingPage")}</div>;
   if (!post) {
     return (
       <div className="sheet items-center justify-center gap-3 px-6 text-center">
-        <p className="font-serif text-2xl">Essa página não está mais aqui.</p>
-        <button type="button" className="paper-btn" onClick={onClose}>Voltar</button>
+        <p className="font-serif text-2xl">{t("pageGone")}</p>
+        <button type="button" className="paper-btn" onClick={onClose}>{t("back")}</button>
       </div>
     );
   }
@@ -58,7 +60,7 @@ export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) 
         <button type="button" className="grid size-11 place-items-center" aria-label="Voltar" onClick={onClose}>
           <ChevronLeft />
         </button>
-        <h2 className="font-serif text-xl">Na margem</h2>
+        <h2 className="font-serif text-xl">{t("inMargin")}</h2>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <BookPage post={post} />
@@ -127,7 +129,7 @@ export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) 
             <button className="seal-btn" type="submit">Enviar denúncia</button>
           </form>
         ) : null}
-        <h3 className="mt-6 font-serif text-lg">Margem</h3>
+        <h3 className="mt-6 font-serif text-lg">{t("margin")}</h3>
         <ul className="mt-2 space-y-3">
           {comments.map((comment) => (
             <li key={comment.id} className="text-sm">
@@ -142,7 +144,7 @@ export function PostSheet({ id, onClose }: { id: string; onClose: () => void }) 
               </p>
             </li>
           ))}
-          {comments.length === 0 ? <li className="text-sm text-ink-soft">Ninguém escreveu na margem ainda.</li> : null}
+          {comments.length === 0 ? <li className="text-sm text-ink-soft">{t("marginEmpty")}</li> : null}
         </ul>
       </div>
       <form onSubmit={send} className="flex gap-2 border-t border-ink/10 p-3">

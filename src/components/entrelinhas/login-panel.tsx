@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
-import { TERMS } from "@/lib/entrelinhas/model";
+import { LangSwitch, say, useLang } from "@/lib/entrelinhas/i18n";
 
 const BEARER_KEY = "grok-auth.bearer-token";
 
@@ -31,19 +31,38 @@ async function authFetch(path: string, body: Record<string, string>) {
   window.location.assign("/");
 }
 
-export function Boot() {
+export function OpenBook() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center text-cream">
-      <div className="boot-book">
-        <p className="font-serif text-xl leading-none tracking-tight">entrelinha-se</p>
-        <p className="mt-2 text-xs tracking-[0.14em] uppercase text-ink-soft">caderno aberto</p>
+    <div className="open-book" aria-hidden="true">
+      <div className="open-leaf left">
+        <p className="open-word">entre</p>
+        <span className="ink-stroke" />
+        <span className="ink-stroke short" />
+        <span className="ink-stroke mid" />
       </div>
-      <p className="font-serif text-lg text-cream">Abrindo o caderno…</p>
+      <div className="open-gutter" />
+      <div className="open-leaf right">
+        <p className="open-word">linha</p>
+        <span className="ink-stroke" />
+        <span className="ink-stroke short" />
+        <span className="seal-dot" />
+      </div>
+    </div>
+  );
+}
+
+export function Boot() {
+  const { t } = useLang();
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-6 px-6 text-center text-cream">
+      <OpenBook />
+      <p className="font-serif text-lg text-cream">{t("opening")}</p>
     </div>
   );
 }
 
 export function LoginPanel() {
+  const { t, lang } = useLang();
   const [mode, setMode] = useState<"in" | "up">("up");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -57,15 +76,15 @@ export function LoginPanel() {
     e.preventDefault();
     setError("");
     if (!email.includes("@") || password.length < 8) {
-      setError("Usa um e-mail válido e uma senha com 8 caracteres ou mais.");
+      setError(t("errEmail"));
       return;
     }
     if (mode === "up" && name.trim().length < 2) {
-      setError("Como a gente te chama?");
+      setError(t("errName"));
       return;
     }
     if (mode === "up" && !terms) {
-      setError("Aceita as regras do caderno pra criar a conta.");
+      setError(t("errTerms"));
       return;
     }
     setBusy(true);
@@ -80,59 +99,63 @@ export function LoginPanel() {
         await authFetch("/api/auth/sign-in/email", { email: email.trim(), password });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não deu pra entrar.");
+      setError(say(lang, err instanceof Error ? err.message : t("errEnter")));
       setBusy(false);
     }
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-5 py-8 text-cream">
-      <p className="text-xs tracking-[0.18em] uppercase text-cream/70">um livro no bolso</p>
-      <h1 className="mt-2 font-serif text-[2.65rem] leading-none tracking-tight">entrelinha-se</h1>
-      <p className="mt-3 max-w-sm font-serif text-lg leading-snug text-cream/85">
-        Feed pra ler sentado. Folhear pra frase curta. A página continua sendo um livro.
-      </p>
+    <div className="flex h-full flex-col overflow-y-auto px-5 pb-8 pt-14 text-cream">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs tracking-[0.18em] uppercase text-cream/70">{t("pocket")}</p>
+        <LangSwitch />
+      </div>
+      <div className="mt-4">
+        <OpenBook />
+      </div>
+      <h1 className="mt-4 text-center font-serif text-[2.4rem] leading-none tracking-tight">entrelinha-se</h1>
+      <p className="mx-auto mt-2 max-w-sm text-center font-serif text-lg leading-snug text-cream/85">{t("tagline")}</p>
 
       <div className="mt-6 flex gap-2">
         <button type="button" className={mode === "up" ? "chip chip-on" : "chip"} onClick={() => setMode("up")}>
-          Criar conta
+          {t("signUp")}
         </button>
         <button type="button" className={mode === "in" ? "chip chip-on" : "chip"} onClick={() => setMode("in")}>
-          Entrar
+          {t("signIn")}
         </button>
       </div>
 
       <form onSubmit={submit} className="mt-5 space-y-3">
         {mode === "up" ? (
-          <input className="field" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+          <input className="field" placeholder={t("namePh")} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
         ) : null}
-        <input className="field" placeholder="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-        <input className="field" placeholder="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "up" ? "new-password" : "current-password"} />
+        <input className="field" placeholder={t("emailPh")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+        <input className="field" placeholder={t("passwordPh")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "up" ? "new-password" : "current-password"} />
         {mode === "up" ? (
           <label className="flex items-start gap-3 text-sm text-cream/90">
             <input type="checkbox" className="mt-1 size-4" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
             <span>
-              Li e aceito as regras do caderno.{" "}
+              {t("accept")}{" "}
               <button type="button" className="underline" onClick={() => setShowTerms((v) => !v)}>
-                Ler
+                {t("read")}
               </button>
             </span>
           </label>
         ) : null}
         {showTerms ? (
           <ul className="space-y-2 rounded-2xl bg-paper p-4 text-sm text-ink">
-            {TERMS.map((line) => (
-              <li key={line}>{line}</li>
+            {(["term1", "term2", "term3", "term4", "term5"] as const).map((key) => (
+              <li key={key}>{t(key)}</li>
             ))}
           </ul>
         ) : null}
         {error ? <p className="text-sm text-cream">{error}</p> : null}
         <button className="seal-btn w-full" type="submit" disabled={busy}>
-          {busy ? "Abrindo…" : mode === "up" ? "Criar meu caderno" : "Entrar"}
+          {busy ? t("openingBtn") : mode === "up" ? t("createBook") : t("enter")}
         </button>
       </form>
 
-      <p className="my-4 text-center text-xs tracking-[0.14em] uppercase text-cream/60">ou</p>
+      <p className="my-4 text-center text-xs tracking-[0.14em] uppercase text-cream/60">{t("or")}</p>
       <div className="space-y-2">
         {GROK_PROVIDERS.map((provider) => (
           <button
@@ -141,7 +164,7 @@ export function LoginPanel() {
             className="paper-btn w-full"
             onClick={() => void signIn(provider.providerId, { callbackURL: "/" })}
           >
-            Continuar com {provider.label}
+            {t("continueWith")} {provider.label}
           </button>
         ))}
       </div>

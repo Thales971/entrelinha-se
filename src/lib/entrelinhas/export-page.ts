@@ -44,10 +44,10 @@ export async function downloadPage(post: PostCard) {
   ctx.fillStyle = "#6e4634";
   ctx.fillRect(80, 80, 26, h - 160);
   ctx.fillStyle = ink;
-  ctx.font = "600 28px Outfit, sans-serif";
+  ctx.font = "600 22px \"Familjen Grotesk\", sans-serif";
   ctx.fillText(KIND_META[post.kind].label.toUpperCase(), 150, 170);
   let y = 240;
-  ctx.font = "650 54px Fraunces, Palatino, serif";
+  ctx.font = "600 54px \"EB Garamond\", Palatino, serif";
   const heading = post.kind === "musica" ? post.songTitle : post.title;
   if (heading) {
     for (const line of wrap(ctx, heading, 780).slice(0, 3)) {
@@ -57,21 +57,21 @@ export async function downloadPage(post: PostCard) {
     y += 10;
   }
   if (post.kind === "musica" && post.artist) {
-    ctx.font = "500 32px Outfit, sans-serif";
+    ctx.font = "500 26px \"Familjen Grotesk\", sans-serif";
     ctx.fillText(post.artist, 150, y);
     y += 56;
   }
-  ctx.font = "500 40px Fraunces, Palatino, serif";
+  ctx.font = "500 42px \"EB Garamond\", Palatino, serif";
   const body = wrap(ctx, post.body, 780).slice(0, 16);
   for (const line of body) {
     ctx.fillText(line, post.align === "center" ? (w - ctx.measureText(line).width) / 2 : 150, y);
     y += 56;
   }
   y = Math.max(y + 40, h - 280);
-  ctx.font = "italic 500 34px Fraunces, Palatino, serif";
+  ctx.font = "italic 500 36px \"EB Garamond\", Palatino, serif";
   const signature = post.citedAuthor || post.penName || post.displayName;
   ctx.fillText(`— ${signature}`, 150, y);
-  ctx.font = "400 26px Outfit, sans-serif";
+  ctx.font = "400 22px \"Familjen Grotesk\", sans-serif";
   ctx.fillText(post.citedAuthor ? `citado por @${post.handle}` : `@${post.handle}`, 150, y + 42);
   ctx.fillText("entrelinha-se", 150, h - 130);
   if (post.coverData) {

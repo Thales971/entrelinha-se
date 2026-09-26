@@ -4,6 +4,7 @@ import { listFeed, listStoryTray, toggleLike, toggleRepost, toggleSave } from "@
 import { ago, type PostCard, type TrayPerson } from "@/lib/entrelinhas/model";
 import { BookPage, Portrait, cx } from "@/components/entrelinhas/book-page";
 import { useDesk } from "@/components/entrelinhas/desk";
+import { useLang } from "@/lib/entrelinhas/i18n";
 import { downloadPage } from "@/lib/entrelinhas/export-page";
 
 export function PageActions({ post, layout = "row", tone = "paper" }: { post: PostCard; layout?: "row" | "rail"; tone?: "paper" | "ink" }) {
@@ -110,6 +111,7 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
 
 export function StoryTray({ tray }: { tray: TrayPerson[] }) {
   const desk = useDesk();
+  const { t } = useLang();
   const mine = tray.find((p) => p.userId === desk.meId);
   return (
     <div className="flex gap-3 overflow-x-auto px-4 pb-3 pt-4 no-scrollbar">
@@ -130,7 +132,7 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
             )}
           </span>
         </span>
-        <span className="mt-1 text-xs text-cream">Sua</span>
+        <span className="mt-1 text-xs text-cream">{t("yours")}</span>
       </button>
       {tray.map((person) => {
         const unseen = person.stories.some((s) => !s.seen);
@@ -191,6 +193,7 @@ export function PostCardView({ post }: { post: PostCard }) {
 
 export function Feed({ mode }: { mode: "all" | "following" }) {
   const desk = useDesk();
+  const { t } = useLang();
   const [q, setQ] = useState("");
   const [posts, setPosts] = useState<PostCard[] | null>(null);
   const [people, setPeople] = useState<{ userId: string; handle: string; displayName: string }[]>([]);
@@ -227,7 +230,7 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
           <Search className="size-4 text-ink-soft" />
           <input
             className="h-11 w-full bg-transparent outline-none"
-            placeholder="Buscar verso, nome, música"
+            placeholder={t("searchPh")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -249,11 +252,11 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
         </div>
       ) : null}
       {error ? <p className="px-4 text-sm text-cream">{error}</p> : null}
-      {posts === null ? <p className="px-4 py-8 font-serif text-cream">Virando a página…</p> : null}
+      {posts === null ? <p className="px-4 py-8 font-serif text-cream">{t("turning")}</p> : null}
       {posts?.length === 0 ? (
         <div className="px-6 py-10 text-cream">
-          <p className="font-serif text-3xl leading-none">A mesa está limpa.</p>
-          <p className="mt-2 text-cream/80">Publica a primeira página, ou segue alguém pra encher o feed.</p>
+          <p className="font-serif text-3xl leading-none">{t("deskClean")}</p>
+          <p className="mt-2 text-cream/80">{t("deskCleanHint")}</p>
         </div>
       ) : null}
       {posts?.map((post) => (

@@ -3,9 +3,11 @@ import { X } from "lucide-react";
 import { deleteStory, listStoryTray, markStorySeen } from "@/lib/entrelinhas/api";
 import { ago, type TrayPerson } from "@/lib/entrelinhas/model";
 import { useDesk } from "@/components/entrelinhas/desk";
+import { useLang } from "@/lib/entrelinhas/i18n";
 
 export function StoryViewer({ userId, onClose }: { userId: string; onClose: () => void }) {
   const desk = useDesk();
+  const { t } = useLang();
   const [tray, setTray] = useState<TrayPerson[] | null>(null);
   const [pi, setPi] = useState(0);
   const [si, setSi] = useState(0);
@@ -64,12 +66,12 @@ export function StoryViewer({ userId, onClose }: { userId: string; onClose: () =
     return () => window.clearTimeout(timer);
   }, [story, next]);
 
-  if (!tray) return <div className="sheet items-center justify-center font-serif">Abrindo…</div>;
+  if (!tray) return <div className="sheet items-center justify-center font-serif">{t("openingStory")}</div>;
   if (!person || !story) {
     return (
       <div className="sheet items-center justify-center gap-4 px-6 text-center">
-        <p className="font-serif text-3xl">Essa história já saiu do ar.</p>
-        <button type="button" className="paper-btn" onClick={onClose}>Voltar</button>
+        <p className="font-serif text-3xl">{t("storyGone")}</p>
+        <button type="button" className="paper-btn" onClick={onClose}>{t("back")}</button>
       </div>
     );
   }

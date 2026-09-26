@@ -1,4 +1,5 @@
 import { KIND_META, MOLDS, INKS, type InkId, type MoldId, type PostCard } from "@/lib/entrelinhas/model";
+import { kindLabel, useLang } from "@/lib/entrelinhas/i18n";
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -15,13 +16,14 @@ export function Portrait({ name, src, className }: { name: string; src?: string;
 }
 
 export function BookPage({ post, tight = false }: { post: PostCard; tight?: boolean }) {
+  const { lang } = useLang();
   const signature = post.citedAuthor || post.penName || post.displayName;
   return (
     <div className={cx("book", `mold-${post.moldId}`, `ink-${post.inkId}`, tight && "scale-[0.98]")}>
       <div className="spine" aria-hidden="true" />
       <article className="page-sheet">
         {post.saved ? <span className="ribbon" aria-hidden="true" /> : null}
-        <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{KIND_META[post.kind].label}</p>
+        <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{kindLabel(lang, post.kind)}</p>
         {post.kind === "musica" && post.songTitle ? (
           <header className="mt-2">
             <h3 className="font-serif text-xl leading-tight text-balance">{post.songTitle}</h3>

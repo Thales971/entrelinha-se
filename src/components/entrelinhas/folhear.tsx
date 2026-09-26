@@ -5,6 +5,7 @@ import type { PostCard } from "@/lib/entrelinhas/model";
 import { BookPage } from "@/components/entrelinhas/book-page";
 import { useDesk } from "@/components/entrelinhas/desk";
 import { PageActions } from "@/components/entrelinhas/feed";
+import { useLang } from "@/lib/entrelinhas/i18n";
 
 function shortEnough(post: PostCard) {
   return post.kind === "frase" || post.kind === "nota" || post.kind === "musica" || post.body.length <= 420;
@@ -12,6 +13,7 @@ function shortEnough(post: PostCard) {
 
 export function Folhear() {
   const desk = useDesk();
+  const { t } = useLang();
   const [posts, setPosts] = useState<PostCard[] | null>(null);
   const [burst, setBurst] = useState<string | null>(null);
   const lastTap = useRef(0);
@@ -34,13 +36,13 @@ export function Folhear() {
     if (navigator.vibrate) navigator.vibrate(12);
   }
 
-  if (!posts) return <p className="px-6 py-16 font-serif text-2xl text-cream">Folheando…</p>;
+  if (!posts) return <p className="px-6 py-16 font-serif text-2xl text-cream">{t("browsing")}</p>;
   if (!posts.length) {
     return (
       <div className="flex h-full flex-col justify-end px-6 pb-10 text-cream">
-        <p className="font-serif text-4xl leading-none">Nada curto pra folhear.</p>
+        <p className="font-serif text-4xl leading-none">{t("nothingShort")}</p>
         <button type="button" className="seal-btn mt-5" onClick={() => desk.openCompose("post", "frase")}>
-          Escrever uma frase
+          {t("writePhrase")}
         </button>
       </div>
     );
