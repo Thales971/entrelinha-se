@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Heart } from "lucide-react";
-import { listFeed, toggleLike } from "@/lib/entrelinhas/api";
+import { listFeed } from "@/lib/entrelinhas/api";
 import type { PostCard } from "@/lib/entrelinhas/model";
 import { BookPage } from "@/components/entrelinhas/book-page";
 import { useDesk } from "@/components/entrelinhas/desk";
@@ -16,6 +16,7 @@ export function Folhear() {
   const { t } = useLang();
   const [posts, setPosts] = useState<PostCard[] | null>(null);
   const [burst, setBurst] = useState<string | null>(null);
+  const loves = useRef(new Map<string, () => void>());
   const lastTap = useRef(0);
 
   useEffect(() => {
@@ -28,12 +29,19 @@ export function Folhear() {
     };
   }, [desk.tick]);
 
-  async function like(post: PostCard) {
-    setBurst(post.id);
-    window.setTimeout(() => setBurst((id) => (id === post.id ? null : id)), 700);
-    await toggleLike({ data: { id: post.id } });
-    desk.refresh();
-    if (navigator.vibrate) navigator.vibrate(12);
+  function tapPage(event: MouseEvent, post: PostCard) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, input, textarea, label")) return;
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      loves.current.get(post.id)?.();
+      setBurst(post.id);
+      window.setTimeout(() => setBurst((id) => (id === post.id ? null : id)), 700);
+      if (navigator.vibrate) navigator.vibrate(12);
+      lastTap.current = 0;
+      return;
+    }
+    lastTap.current = now;
   }
 
   if (!posts) return <p className="px-6 py-16 font-serif text-2xl text-cream">{t("browsing")}</p>;
@@ -53,20 +61,26 @@ export function Folhear() {
       {posts.map((post) => (
         <section
           key={`${post.id}-${post.reposterHandle || "origem"}`}
-          className="folhear-slide flex items-stretch px-3 py-3"
-          onClick={() => {
-            const now = Date.now();
-            if (now - lastTap.current < 280) void like(post);
-            lastTap.current = now;
-          }}
+          className="folhear-slide"
+          onClick={(event) => tapPage(event, post)}
         >
-          <div className="flex h-full w-full items-stretch pr-14">
-            <div className="h-full min-w-0 flex-1">
-              <BookPage post={post} />
-            </div>
-          </div>
-          <div className="absolute bottom-8 right-3" onClick={(e) => e.stopPropagation()}>
-            <PageActions post={post} layout="rail" />
+          {post.reposterHandle ? <p className="leaf-pass">Repassada por @{post.reposterHandle}</p> : null}
+          <div className="leaf-fit">
+            <BookPage
+              post={post}
+              leaf
+              onAuthor={() => desk.openUser(post.userId)}
+              footer={
+                <PageActions
+                  post={post}
+                  layout="leaf"
+                  tone="ink"
+                  onLove={(love) => {
+                    loves.current.set(post.id, love);
+                  }}
+                />
+              }
+            />
           </div>
           {burst === post.id ? <Heart className="pop-heart size-24 fill-seal" /> : null}
         </section>

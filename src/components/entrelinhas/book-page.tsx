@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { KIND_META, MOLDS, INKS, type InkId, type MoldId, type PostCard } from "@/lib/entrelinhas/model";
 import { kindLabel, useLang } from "@/lib/entrelinhas/i18n";
 import { translateLines } from "@/lib/entrelinhas/translate";
@@ -17,34 +17,69 @@ export function Portrait({ name, src, className }: { name: string; src?: string;
   return <Monogram name={name} className={className} />;
 }
 
-export function BookPage({ post, tight = false }: { post: PostCard; tight?: boolean }) {
+export function BookPage({
+  post,
+  tight = false,
+  leaf = false,
+  onAuthor,
+  footer,
+}: {
+  post: PostCard;
+  tight?: boolean;
+  leaf?: boolean;
+  onAuthor?: () => void;
+  footer?: ReactNode;
+}) {
   const { lang, t } = useLang();
   const signature = post.citedAuthor || post.penName || post.displayName;
+  const page = (
+    <>
+      <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{kindLabel(t, post.kind)}</p>
+      {post.kind === "musica" && post.songTitle ? (
+        <header className="mt-2">
+          <h3 className="font-serif text-xl leading-tight text-balance">{post.songTitle}</h3>
+          <p className="mt-1 text-sm text-ink-soft">{post.artist}</p>
+        </header>
+      ) : post.title ? (
+        <h3 className="mt-2 font-serif text-xl leading-tight text-balance">{post.title}</h3>
+      ) : null}
+      <div className="ornament" aria-hidden="true" />
+      <Verse text={post.body} cover={Boolean(post.coverData)} align={post.align} target={lang} label={t("translate")} back={t("showOriginal")} />
+      {post.coverData ? (
+        <img className="cover-stamp" src={post.coverData} alt={`Foto enviada por @${post.handle}`} />
+      ) : null}
+      <footer className={post.align === "center" ? "mt-4 text-center" : "mt-4"}>
+        <p className="font-serif italic">— {signature}</p>
+        {post.citedAuthor ? (
+          <p className="mt-1 font-sans text-xs text-ink-soft">citado por @{post.handle}</p>
+        ) : leaf ? null : (
+          <p className="mt-1 font-sans text-xs text-ink-soft">@{post.handle}</p>
+        )}
+      </footer>
+    </>
+  );
   return (
     <div className={cx("book", `mold-${post.moldId}`, `ink-${post.inkId}`, tight && "scale-[0.98]")}>
       <div className="spine" aria-hidden="true" />
       <article className="page-sheet">
         {post.saved ? <span className="ribbon" aria-hidden="true" /> : null}
-        <p className="font-sans text-xs tracking-[0.16em] uppercase text-ink-soft">{kindLabel(t, post.kind)}</p>
-        {post.kind === "musica" && post.songTitle ? (
-          <header className="mt-2">
-            <h3 className="font-serif text-xl leading-tight text-balance">{post.songTitle}</h3>
-            <p className="mt-1 text-sm text-ink-soft">{post.artist}</p>
-          </header>
-        ) : post.title ? (
-          <h3 className="mt-2 font-serif text-xl leading-tight text-balance">{post.title}</h3>
-        ) : null}
-        <div className="ornament" aria-hidden="true" />
-        <Verse text={post.body} cover={Boolean(post.coverData)} align={post.align} target={lang} label={t("translate")} back={t("showOriginal")} />
-        {post.coverData ? (
-          <img className="cover-stamp" src={post.coverData} alt={`Foto enviada por @${post.handle}`} />
-        ) : null}
-        <footer className={cx("mt-4", post.align === "center" && "text-center")}>
-          <p className="font-serif italic">— {signature}</p>
-          <p className="mt-1 font-sans text-xs text-ink-soft">
-            {post.citedAuthor ? `citado por @${post.handle}` : `@${post.handle}`}
-          </p>
-        </footer>
+        {leaf ? (
+          <>
+            {onAuthor ? (
+              <button type="button" className="leaf-who" onClick={onAuthor}>
+                <Portrait name={post.penName || post.displayName} src={post.avatarData} className="size-9" />
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">{post.penName || post.displayName}</span>
+                  <span className="block truncate text-xs text-ink-soft">@{post.handle}</span>
+                </span>
+              </button>
+            ) : null}
+            <div className="leaf-stage">{page}</div>
+            {footer}
+          </>
+        ) : (
+          page
+        )}
       </article>
     </div>
   );

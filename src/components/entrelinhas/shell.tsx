@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Layers, Mail, Plus, UserRound } from "lucide-react";
 import type { AppUser } from "@/lib/auth/use-current-user";
-import { getMe, publishKey, versoDoDia } from "@/lib/entrelinhas/api";
+import { getMe, publishKey } from "@/lib/entrelinhas/api";
 import type { PostKind } from "@/lib/entrelinhas/model";
 import { Boot } from "@/components/entrelinhas/login-panel";
 import { Onboarding } from "@/components/entrelinhas/onboarding";
@@ -29,7 +29,6 @@ export function Shell({ user }: { user: AppUser }) {
   const [bundle, setBundle] = useState<Awaited<ReturnType<typeof getMe>> | undefined>(undefined);
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>("inicio");
-  const [verso, setVerso] = useState<{ id: string; body: string; name: string } | null>(null);
   const [feedMode, setFeedMode] = useState<"all" | "following">("all");
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [sealLost, setSealLost] = useState(false);
@@ -45,16 +44,6 @@ export function Shell({ user }: { user: AppUser }) {
       live = false;
     };
   }, [tick, user.id]);
-
-  useEffect(() => {
-    let live = true;
-    versoDoDia()
-      .then((row) => live && setVerso(row))
-      .catch(() => live && setVerso(null));
-    return () => {
-      live = false;
-    };
-  }, [tick]);
 
   useEffect(() => {
     if (!bundle?.profile.userId) return;
@@ -88,26 +77,19 @@ export function Shell({ user }: { user: AppUser }) {
     <DeskProvider value={api}>
       <div className="relative flex h-full min-h-0 flex-col">
         {tab === "inicio" && !overlay ? (
-          <header className="topbar joined px-4 pt-4">
+          <header className="mast">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">{t("shelf")}</p>
-              <div className="flex items-center gap-2">
-                <button type="button" className={cx("chip-ink", feedMode === "all" && "on")} onClick={() => setFeedMode("all")}>
-                  {t("all")}
-                </button>
-                <button type="button" className={cx("chip-ink", feedMode === "following" && "on")} onClick={() => setFeedMode("following")}>
-                  {t("following")}
-                </button>
-                <Lamp />
-              </div>
+              <h1 className="font-serif text-2xl leading-none tracking-tight">entrelinha-se</h1>
+              <Lamp />
             </div>
-            <h1 className="mt-1 font-serif text-[2rem] leading-none tracking-tight">entrelinha-se</h1>
-            {verso ? (
-              <button type="button" className="verso-slip" onClick={() => setOverlay({ type: "post", id: verso.id })}>
-                <p>{verso.body}</p>
-                <span className="mt-1 block text-xs text-ink-soft">{t("dayVerse")} · {verso.name}</span>
+            <div className="mast-tabs" role="tablist">
+              <button type="button" role="tab" aria-selected={feedMode === "all"} className={feedMode === "all" ? "on" : ""} onClick={() => setFeedMode("all")}>
+                {t("all")}
               </button>
-            ) : null}
+              <button type="button" role="tab" aria-selected={feedMode === "following"} className={feedMode === "following" ? "on" : ""} onClick={() => setFeedMode("following")}>
+                {t("following")}
+              </button>
+            </div>
           </header>
         ) : !overlay ? (
           <header className="shelf-lip">

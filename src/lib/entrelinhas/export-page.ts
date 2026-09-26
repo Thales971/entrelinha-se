@@ -85,8 +85,19 @@ export async function downloadPage(post: PostCard) {
       img.src = post.coverData;
     });
   }
-  const a = document.createElement("a");
-  a.href = canvas.toDataURL("image/png");
-  a.download = `entrelinha-se-${post.handle}.png`;
-  a.click();
+  try {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((file) => resolve(file), "image/png"));
+    if (!blob) return false;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `entrelinha-se-${post.handle}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return true;
+  } catch {
+    return false;
+  }
 }

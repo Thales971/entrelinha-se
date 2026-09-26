@@ -12,4 +12,8 @@ dist
 *.log
 .env
 .env.*
+attachments
+mobile/node_modules
+mobile/.expo
+
 .DS_Store

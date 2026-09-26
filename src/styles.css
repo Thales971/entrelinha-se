@@ -17,18 +17,22 @@
 }
 
 @layer base {
-  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; height: 100%; overflow: hidden; }
   body {
     font-family: var(--font-sans);
     color: var(--color-ink);
     background: var(--color-wood-deep);
+    height: 100%;
+    overflow: hidden;
   }
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   ::selection { background: color-mix(in srgb, var(--color-seal) 28%, transparent); }
 }
 
 .desk {
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   background-color: #24180f;
   background-image:
     radial-gradient(ellipse at 18% -8%, rgba(232, 196, 150, 0.22), transparent 46%),
@@ -47,6 +51,19 @@
   position: relative;
   overflow: hidden;
   box-shadow: 0 0 0 1px rgba(243, 234, 220, 0.08), 0 30px 80px rgba(0, 0, 0, 0.35);
+  scrollbar-width: none;
+}
+.phone,
+.phone * {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+.phone::-webkit-scrollbar,
+.phone *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+  background: transparent;
 }
 
 .topbar {
@@ -217,6 +234,7 @@ html[data-lamp="night"] .boot-book {
 }
 .lamp-btn.on-paper,
 .topbar .lamp-btn,
+.mast .lamp-btn,
 .shelf-lip .lamp-btn {
   background: color-mix(in srgb, var(--color-ink) 8%, var(--color-paper));
   color: var(--color-ink);
@@ -539,6 +557,28 @@ html[data-lamp="night"] .lamp-btn {
   padding-bottom: 0;
   box-shadow: none;
 }
+.mast {
+  flex: none;
+  padding: 0.85rem 1rem 0;
+  background: color-mix(in srgb, var(--color-paper) 92%, var(--color-leather));
+  color: var(--color-ink);
+}
+.mast-tabs {
+  display: flex;
+  gap: 1.15rem;
+  margin-top: 0.1rem;
+}
+.mast-tabs button {
+  min-height: 2.4rem;
+  padding: 0.15rem 0 0.4rem;
+  color: var(--color-ink-soft);
+  font-size: 0.95rem;
+  border-bottom: 2px solid transparent;
+}
+.mast-tabs button.on {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-seal);
+}
 .shelf-lip {
   display: flex;
   align-items: flex-end;
@@ -555,28 +595,30 @@ html[data-lamp="night"] .lamp-btn {
 .story-dock {
   flex: none;
   margin-top: -1px;
-  padding-bottom: 0.45rem;
+  padding: 0.05rem 0 0.45rem;
   background: color-mix(in srgb, var(--color-paper) 92%, var(--color-leather));
   color: var(--color-ink);
-  border-bottom-left-radius: 1.45rem;
-  border-bottom-right-radius: 1.45rem;
-  box-shadow: 0 16px 22px rgba(20, 12, 8, 0.18);
+  border-bottom-left-radius: 1.25rem;
+  border-bottom-right-radius: 1.25rem;
+  box-shadow: 0 12px 18px rgba(20, 12, 8, 0.16);
 }
-.verso-slip {
-  margin-top: 0.85rem;
-  display: block;
+.desk-search {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  color: color-mix(in srgb, var(--color-cream) 78%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-cream) 28%, transparent);
+}
+.desk-search input {
+  height: 2.75rem;
   width: 100%;
-  text-align: left;
-  border-radius: 0;
   background: transparent;
-  color: var(--color-ink);
-  padding: 0.7rem 0 0.15rem;
-  border-top: 1px solid color-mix(in srgb, var(--color-seal) 32%, transparent);
+  color: var(--color-cream);
+  outline: none;
 }
-.verso-slip p {
-  font-family: var(--font-serif);
-  font-size: 0.98rem;
-  line-height: 1.35;
+.desk-search input::placeholder {
+  color: color-mix(in srgb, var(--color-cream) 48%, transparent);
 }
 .ink-actions { margin-top: 0.4rem; }
 
@@ -635,11 +677,68 @@ html[data-lamp="night"] .bubble-them { background: #2c241c; color: #f6f1e6; }
   scroll-snap-align: start;
   scroll-snap-stop: always;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0.65rem 0.8rem 0.75rem;
 }
+.leaf-fit {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.leaf-fit > .book { flex: 1; min-width: 0; }
 .folhear .book,
 .folhear .page-sheet { height: 100%; }
 .folhear .page-sheet { display: flex; flex-direction: column; }
-.folhear .verse { flex: 1; }
+.folhear .verse { flex: none; font-size: 1.5rem; line-height: 1.35; }
+.leaf-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: auto;
+  scrollbar-width: none;
+}
+.leaf-stage::-webkit-scrollbar { display: none; }
+.leaf-who {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 2.75rem;
+  color: inherit;
+  text-align: left;
+}
+.leaf-actions {
+  border-top: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  padding-top: 0.15rem;
+}
+.leaf-act {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  color: inherit;
+}
+.leaf-note {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--color-ink-soft);
+}
+.leaf-pass {
+  flex: none;
+  padding: 0 0.15rem 0.35rem;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--color-cream) 78%, transparent);
+}
+.folhear .translate-btn {
+  min-height: 2.75rem;
+  align-self: flex-start;
+  font-size: 0.85rem;
+}
 
 .pop-heart {
   position: absolute;

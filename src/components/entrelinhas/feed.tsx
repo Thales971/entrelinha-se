@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bookmark, Download, Heart, MessageCircle, Plus, Repeat2, Search } from "lucide-react";
 import { listFeed, listStoryTray, toggleLike, toggleRepost, toggleSave } from "@/lib/entrelinhas/api";
 import { ago, type PostCard, type TrayPerson } from "@/lib/entrelinhas/model";
@@ -7,7 +7,17 @@ import { useDesk } from "@/components/entrelinhas/desk";
 import { useLang } from "@/lib/entrelinhas/i18n";
 import { downloadPage } from "@/lib/entrelinhas/export-page";
 
-export function PageActions({ post, layout = "row", tone = "paper" }: { post: PostCard; layout?: "row" | "rail"; tone?: "paper" | "ink" }) {
+export function PageActions({
+  post,
+  layout = "row",
+  tone = "paper",
+  onLove,
+}: {
+  post: PostCard;
+  layout?: "row" | "rail" | "leaf";
+  tone?: "paper" | "ink";
+  onLove?: (love: () => void) => void;
+}) {
   const [liked, setLiked] = useState(post.liked);
   const [count, setCount] = useState(post.likeCount);
   const [saved, setSaved] = useState(post.saved);
@@ -24,6 +34,14 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
     setReposted(post.reposted);
     setReposts(post.repostCount);
   }, [post.id, post.liked, post.likeCount, post.saved, post.reposted, post.repostCount, post.reposterHandle]);
+
+  const noteTimer = useRef(0);
+  function say(text: string) {
+    setNote(text);
+    window.clearTimeout(noteTimer.current);
+    if (!text) return;
+    noteTimer.current = window.setTimeout(() => setNote((cur) => (cur === text ? "" : cur)), 1800);
+  }
 
   async function like() {
     const next = !liked;
@@ -48,11 +66,11 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
     const res = await toggleSave({ data: { id: post.id } });
     if (!res.ok) {
       setSaved(!next);
-      setNote(res.error);
+      say(res.error);
       return;
     }
     setSaved(res.saved);
-    setNote(res.saved ? "Na fita." : "");
+    say(res.saved ? "Na fita." : "Tirei da fita.");
   }
 
   async function repost() {
@@ -63,21 +81,36 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
     if (!res.ok) {
       setReposted(!next);
       setReposts((c) => Math.max(0, c + (next ? -1 : 1)));
-      setNote(res.error);
+      say(res.error);
       return;
     }
     setReposted(res.reposted);
     setReposts(res.repostCount);
-    setNote(res.reposted ? "Repassada." : "");
+    say(res.reposted ? "Repassada." : "Tirei o repasse.");
   }
 
-  const item = layout === "rail" ? "rail-btn" : `tap flex min-h-11 items-center gap-1 px-1 ${tone === "ink" ? "text-ink" : "text-cream"}`;
+  const loveRef = useRef<() => void>(() => {});
+  loveRef.current = () => {
+    if (!liked) void like();
+  };
+  useEffect(() => {
+    onLove?.(() => loveRef.current());
+  }, [onLove]);
+
+  async function image() {
+    const ok = await downloadPage(post).catch(() => false);
+    say(ok ? "Imagem pronta." : "Não deu pra gerar a imagem.");
+  }
+
+  const item = layout === "rail" ? "rail-btn" : layout === "leaf" ? "leaf-act" : `tap flex min-h-11 items-center gap-1 px-1 ${tone === "ink" ? "text-ink" : "text-cream"}`;
+  const counted = layout !== "rail";
   return (
-    <div className={layout === "rail" ? "flex flex-col gap-3" : "mt-2"}>
-      <div className={layout === "rail" ? "flex flex-col gap-3" : "flex items-center gap-1"}>
+    <div className={layout === "rail" ? "flex flex-col gap-3" : layout === "leaf" ? "leaf-actions" : "mt-2"}>
+      {layout === "leaf" && note ? <p className="leaf-note">{note}</p> : null}
+      <div className={layout === "rail" ? "flex flex-col gap-3" : layout === "leaf" ? "flex w-full items-center justify-between" : "flex items-center gap-1"}>
         <button type="button" className={item} onClick={() => void like()} aria-pressed={liked} aria-label="Curtir">
           <Heart className={cx("size-5", liked && "fill-seal text-seal")} />
-          {layout === "row" ? <span className="tabular-nums text-sm">{count}</span> : null}
+          {counted ? <span className="tabular-nums text-sm">{count}</span> : null}
         </button>
         <button type="button" className={item} onClick={() => void save()} aria-pressed={saved} aria-label="Guardar na fita">
           <Bookmark className={cx("size-5", saved && "fill-seal text-seal")} />
@@ -85,26 +118,21 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
         {mine ? null : (
           <button type="button" className={item} onClick={() => void repost()} aria-pressed={reposted} aria-label="Republicar">
             <Repeat2 className={cx("size-5", reposted && "text-seal")} />
-            {layout === "row" ? <span className="tabular-nums text-sm">{reposts}</span> : null}
+            {counted ? <span className="tabular-nums text-sm">{reposts}</span> : null}
           </button>
         )}
-        {layout === "rail" ? (
+        {layout === "row" ? null : (
           <button type="button" className={item} aria-label="Comentários" onClick={() => desk.openPost(post.id)}>
             <MessageCircle className="size-5" />
+            {counted ? <span className="tabular-nums text-sm">{post.commentCount}</span> : null}
           </button>
-        ) : null}
-        {layout === "rail" ? (
-          <button type="button" className={item} aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
-            <Download className="size-5" />
-          </button>
-        ) : null}
-        {layout === "row" ? (
-          <button type="button" className={`tap grid size-11 place-items-center ${tone === "ink" ? "text-ink" : "text-cream"}`} aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
-            <Download className="size-5" />
-          </button>
-        ) : null}
+        )}
+        <button type="button" className={layout === "row" ? `tap grid size-11 place-items-center ${tone === "ink" ? "text-ink" : "text-cream"}` : item} aria-label="Guardar imagem da página" onClick={() => void image()}>
+          <Download className="size-5" />
+        </button>
       </div>
-      {note ? <p className={cx("text-xs", layout === "rail" ? "sr-only" : "px-1 text-cream/80")}>{note}</p> : null}
+      {note && layout === "row" ? <p className="px-1 text-xs text-cream/80">{note}</p> : null}
+      {note && layout === "rail" ? <p className="sr-only">{note}</p> : null}
     </div>
   );
 }
@@ -236,12 +264,11 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
       <div className="story-dock">
         <StoryTray tray={tray} onPaper />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="px-4 pt-3">
-        <label className="search-pill flex items-center gap-2 rounded-full bg-paper px-3 text-ink">
-          <Search className="size-4 text-ink-soft" />
+      <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
+      <div className="px-4 pt-4">
+        <label className="desk-search">
+          <Search className="size-4 shrink-0" />
           <input
-            className="h-11 w-full bg-transparent outline-none"
             placeholder={t("searchPh")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
