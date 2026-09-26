@@ -45,7 +45,7 @@ export const TERMS = [
   "Não cabe assédio, ameaça, nudez, golpe nem conteúdo ilegal.",
   "Música é só um trecho curto, de até 4 linhas, escrito por você. Sem letra inteira e sem capa oficial de álbum.",
   "Dá para denunciar e bloquear. Três pessoas diferentes denunciando a mesma página escondem ela dos outros.",
-  "Xingamento, ameaça, link, spam e dado pessoal não são publicados.",
+  "Xingamento, ameaça, discurso de ódio, link, spam e dado pessoal não são publicados, nem disfarçados.",
 ];
 
 export type PostCard = {

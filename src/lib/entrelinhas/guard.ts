@@ -1,19 +1,20 @@
 import type { Sql } from "@/lib/db";
 
-const WORDS = [
+const EXACT = new Set([
   "merda",
-  "merdinha",
   "porra",
   "caralho",
   "caralha",
   "foder",
+  "foda",
   "fodase",
-  "fodendo",
   "buceta",
+  "puta",
   "putaria",
   "arrombado",
   "arrombada",
   "vadia",
+  "vadio",
   "punheta",
   "boquete",
   "viado",
@@ -21,6 +22,58 @@ const WORDS = [
   "bicha",
   "bixa",
   "traveco",
+  "baitola",
+  "boiola",
+  "maricas",
+  "sapatao",
+  "sapatona",
+  "piroca",
+  "cacete",
+  "bosta",
+  "otario",
+  "babaca",
+  "imbecil",
+  "retardado",
+  "mongoloide",
+  "cuzao",
+  "cu",
+  "fdp",
+  "pqp",
+  "vsf",
+  "vsfd",
+  "tnc",
+  "vtnc",
+  "krl",
+  "kct",
+  "sfd",
+  "fdc",
+  "pnc",
+  "vtmnc",
+  "nigger",
+  "nigga",
+  "crioulo",
+]);
+
+const STEMS = [
+  "merd",
+  "puta",
+  "porr",
+  "fod",
+  "arrombad",
+  "caralh",
+  "merdin",
+  "bucet",
+  "piroca",
+  "putinh",
+  "otari",
+  "retardad",
+  "mongoloid",
+  "fodid",
+  "foded",
+  "cuza",
+];
+
+const PHRASES = [
   "filho da puta",
   "filha da puta",
   "vai se foder",
@@ -29,29 +82,22 @@ const WORDS = [
   "vou te matar",
   "vou te estuprar",
   "te estupro",
+  "sieg heil",
+  "heil hitler",
+  "white power",
+  "ku klux",
+  "morte aos",
+  "seu macaco",
 ];
 
-const BOUNDARY = new RegExp(`\\b(?:${WORDS.map(escapeReg).join("|")})\\b`, "i");
-const LONG = WORDS.filter((word) => word.length >= 5 && !word.includes(" "));
+const HATE_ATTACK = /\b(odeio|odio|extermin\w*|linchar|queimar os|matar os|morte aos)\b/;
+const HATE_GROUP =
+  /\b(judeus?|negros?|pretos?|gays?|lesbicas?|travestis?|nordestinos?|indios|ciganos?|mulheres|muculmanos?|refugiados|cristaos?|deficientes)\b/;
 
 const MINOR = /\b(crianca|criancinha|menor de idade|pedofil\w*|infantil)\b/;
 const SEXUAL = /\b(sexo|nua|nuas|pelad\w*|buceta|penis|transar|porn\w*|estupra\w*|foder|fodendo)\b/;
 
-const PACE: Record<string, { limit: number; seconds: number; message: string }> = {
-  post: { limit: 6, seconds: 60 * 60, message: "Calma com as páginas. Espera um pouco pra publicar de novo." },
-  comment: { limit: 20, seconds: 10 * 60, message: "Muitos comentários seguidos. Espera um instante." },
-  story: { limit: 8, seconds: 60 * 60, message: "Muitos recados seguidos. Espera um pouco." },
-  message: { limit: 40, seconds: 10 * 60, message: "Mensagens demais agora. Espera um instante." },
-  follow: { limit: 30, seconds: 60 * 60, message: "Seguir em massa não passa. Espera um pouco." },
-  report: { limit: 12, seconds: 60 * 60, message: "Denúncias demais agora. Espera um pouco." },
-  profile: { limit: 20, seconds: 60 * 60, message: "Você alterou o caderno rápido demais. Espera um pouco." },
-  like: { limit: 60, seconds: 10 * 60, message: "Curtidas demais agora. Espera um instante." },
-  chat: { limit: 15, seconds: 60 * 60, message: "Abrir conversa em massa não passa." },
-};
-
-function escapeReg(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const BLOCKED = "Xingamento e discurso de ódio não entram. Nada disso foi salvo.";
 
 function fold(value: string) {
   return value
@@ -60,17 +106,57 @@ function fold(value: string) {
     .replace(/[@4]/g, "a")
     .replace(/3/g, "e")
     .replace(/1/g, "i")
+    .replace(/!/g, "i")
     .replace(/0/g, "o")
-    .replace(/5/g, "s")
+    .replace(/[5$]/g, "s")
     .replace(/7/g, "t")
     .toLowerCase();
+}
+
+function soften(token: string) {
+  return token.replace(/(.)\1{2,}/g, "$1$1");
+}
+
+function forms(token: string) {
+  const mild = soften(token);
+  return [token, mild, token.replace(/k/g, "c"), mild.replace(/k/g, "c")];
+}
+
+function bannedToken(token: string) {
+  for (const form of forms(token)) {
+    if (EXACT.has(form)) return true;
+    if (STEMS.some((stem) => form.startsWith(stem))) return true;
+  }
+  return false;
+}
+
+function sentenceOf(folded: string) {
+  const parts = folded.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const tokens: string[] = [];
+  let singles = "";
+  const flush = () => {
+    if (singles.length >= 2) tokens.push(singles);
+    singles = "";
+  };
+  for (const part of parts) {
+    const token = soften(part);
+    if (token.length === 1) singles += token;
+    else {
+      flush();
+      tokens.push(token);
+    }
+  }
+  flush();
+  return tokens;
 }
 
 export function rejectText(...parts: string[]): string | null {
   const raw = parts.filter((part) => part.trim()).join("\n");
   if (!raw) return null;
+  if (/[卐卍]/.test(raw)) return BLOCKED;
   const folded = fold(raw);
-  const spaced = folded.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const tokens = sentenceOf(folded);
+  const spaced = tokens.join(" ");
   const squeezed = spaced.replace(/\s/g, "");
 
   if (
@@ -85,21 +171,31 @@ export function rejectText(...parts: string[]): string | null {
     return "Não publica CPF, telefone nem dado de outra pessoa.";
   }
   if (/(.)\1{14,}/.test(squeezed)) return "Isso parece spam. Escreve de verdade.";
-  const words = spaced.split(" ").filter(Boolean);
-  if (words.length >= 8) {
+  if (tokens.length >= 8) {
     const counts = new Map<string, number>();
-    for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1);
+    for (const token of tokens) counts.set(token, (counts.get(token) ?? 0) + 1);
     const top = Math.max(...counts.values());
-    if (top >= 8 && top / words.length > 0.6) return "Isso parece spam. Escreve de verdade.";
+    if (top >= 8 && top / tokens.length > 0.6) return "Isso parece spam. Escreve de verdade.";
   }
-  if (MINOR.test(spaced) && SEXUAL.test(spaced)) {
-    return "Esse tipo de texto não entra.";
-  }
-  if (BOUNDARY.test(spaced) || LONG.some((word) => squeezed.includes(word))) {
-    return "Xingamento, ameaça e ódio não passam neste caderno.";
-  }
+  if (MINOR.test(spaced) && SEXUAL.test(spaced)) return "Esse tipo de texto não entra.";
+  if (/\b1488\b/.test(spaced) || /\b14 88\b/.test(spaced)) return BLOCKED;
+  if (PHRASES.some((phrase) => spaced.includes(phrase))) return BLOCKED;
+  if (HATE_ATTACK.test(spaced) && HATE_GROUP.test(spaced)) return BLOCKED;
+  if (tokens.some(bannedToken)) return BLOCKED;
   return null;
 }
+
+const PACE: Record<string, { limit: number; seconds: number; message: string }> = {
+  post: { limit: 6, seconds: 60 * 60, message: "Calma com as páginas. Espera um pouco pra publicar de novo." },
+  comment: { limit: 20, seconds: 10 * 60, message: "Muitos comentários seguidos. Espera um instante." },
+  story: { limit: 8, seconds: 60 * 60, message: "Muitos recados seguidos. Espera um pouco." },
+  message: { limit: 40, seconds: 10 * 60, message: "Mensagens demais agora. Espera um instante." },
+  follow: { limit: 30, seconds: 60 * 60, message: "Seguir em massa não passa. Espera um pouco." },
+  report: { limit: 12, seconds: 60 * 60, message: "Denúncias demais agora. Espera um pouco." },
+  profile: { limit: 20, seconds: 60 * 60, message: "Você alterou o caderno rápido demais. Espera um pouco." },
+  like: { limit: 60, seconds: 10 * 60, message: "Curtidas demais agora. Espera um instante." },
+  chat: { limit: 15, seconds: 60 * 60, message: "Abrir conversa em massa não passa." },
+};
 
 export function acceptImage(value: string): string {
   if (!value) return "";

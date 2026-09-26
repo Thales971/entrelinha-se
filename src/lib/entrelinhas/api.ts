@@ -63,6 +63,10 @@ function alignOf(value: unknown, kind: PostKind): "left" | "center" {
   return kind === "frase" || kind === "nota" ? "center" : "left";
 }
 
+function safeName(value: string) {
+  return rejectText(value) ? "Retido" : value;
+}
+
 function duplicate(error: unknown) {
   const msg = error instanceof Error ? error.message.toLowerCase() : "";
   return msg.includes("unique") || msg.includes("duplicate");
@@ -96,7 +100,7 @@ type PostRow = {
 
 function mapPost(r: PostRow): PostCard {
   const kind = kindOf(r.kind) ?? "nota";
-  return {
+  const card: PostCard = {
     id: r.id,
     userId: r.user_id,
     kind,
@@ -111,12 +115,21 @@ function mapPost(r: PostRow): PostCard {
     align: r.align === "center" ? "center" : "left",
     createdAt: r.created_at,
     handle: r.handle,
-    displayName: r.display_name,
-    penName: r.pen_name,
+    displayName: safeName(r.display_name),
+    penName: rejectText(r.pen_name) ? "" : r.pen_name,
     likeCount: num(r.like_count),
     commentCount: num(r.comment_count),
     liked: num(r.liked_by_me) > 0,
   };
+  if (card.userId !== "casa" && rejectText(card.title, card.body, card.citedAuthor, card.songTitle, card.artist)) {
+    card.title = "";
+    card.body = "Esta página foi retida.";
+    card.citedAuthor = "";
+    card.songTitle = "";
+    card.artist = "";
+    card.coverData = "";
+  }
+  return card;
 }
 
 async function isBlocked(a: string, b: string) {
@@ -200,12 +213,12 @@ async function loadBundle(viewerId: string, userId: string) {
   const profile: Profile = {
     userId: row.user_id,
     handle: row.handle,
-    displayName: row.display_name,
-    penName: row.pen_name,
-    bio: row.bio,
+    displayName: rejectText(row.display_name) ? "Retido" : row.display_name,
+    penName: rejectText(row.pen_name) ? "" : row.pen_name,
+    bio: rejectText(row.bio) ? "" : row.bio,
     moldId: moldOf(row.mold_id),
     inkId: inkOf(row.ink_id),
-    noteText: row.note_text ?? "",
+    noteText: rejectText(row.note_text ?? "") ? "" : (row.note_text ?? ""),
     noteFresh: num(row.note_fresh) > 0,
     followers: num(row.followers),
     following: num(row.following),
@@ -396,8 +409,8 @@ export const listFeed = createServerFn({ method: "POST" })
       people = found.map((p) => ({
         userId: p.user_id,
         handle: p.handle,
-        displayName: p.display_name,
-        penName: p.pen_name,
+        displayName: safeName(p.display_name),
+        penName: rejectText(p.pen_name) ? "" : p.pen_name,
         bio: p.bio,
         moldId: moldOf(p.mold_id),
       }));
@@ -434,8 +447,8 @@ export const listPeople = createServerFn({ method: "GET" })
     return rows.map((p) => ({
       userId: p.user_id,
       handle: p.handle,
-      displayName: p.display_name,
-      penName: p.pen_name,
+      displayName: safeName(p.display_name),
+      penName: rejectText(p.pen_name) ? "" : p.pen_name,
       bio: p.bio,
       moldId: moldOf(p.mold_id),
       followedByMe: num(p.followed_by_me) > 0,
@@ -620,11 +633,11 @@ export const getPost = createServerFn({ method: "GET" })
       comments: comments.map((c) => ({
         id: c.id,
         userId: c.user_id,
-        body: c.body,
+        body: rejectText(c.body) ? "Comentário retido." : c.body,
         createdAt: c.created_at,
         handle: c.handle,
-        displayName: c.display_name,
-        penName: c.pen_name,
+        displayName: safeName(c.display_name),
+        penName: rejectText(c.pen_name) ? "" : c.pen_name,
         mine: c.user_id === me,
       })),
     };
@@ -761,7 +774,7 @@ export const listStoryTray = createServerFn({ method: "GET" })
       const list = byUser.get(s.user_id) ?? [];
       list.push({
         id: s.id,
-        body: s.body,
+        body: rejectText(s.body) ? "Recado retido." : s.body,
         moldId: moldOf(s.mold_id),
         createdAt: s.created_at,
         seen: num(s.seen) > 0,
@@ -771,8 +784,8 @@ export const listStoryTray = createServerFn({ method: "GET" })
     const tray: TrayPerson[] = people.map((p) => ({
       userId: p.user_id,
       handle: p.handle,
-      displayName: p.display_name,
-      penName: p.pen_name,
+      displayName: safeName(p.display_name),
+      penName: rejectText(p.pen_name) ? "" : p.pen_name,
       moldId: moldOf(p.mold_id),
       note: p.note_text ?? "",
       stories: byUser.get(p.user_id) ?? [],
@@ -885,9 +898,9 @@ export const listConversations = createServerFn({ method: "GET" })
       id: r.id,
       otherUserId: r.other_id,
       handle: r.handle,
-      displayName: r.display_name,
-      penName: r.pen_name,
-      lastBody: r.last_body,
+      displayName: safeName(r.display_name),
+      penName: rejectText(r.pen_name) ? "" : r.pen_name,
+      lastBody: rejectText(r.last_body) ? "Mensagem retida." : r.last_body,
       lastAt: r.last_at,
     }));
     return chats;
@@ -970,7 +983,7 @@ export const listMessages = createServerFn({ method: "POST" })
       messages: rows.map((m) => ({
         id: m.id,
         senderId: m.sender_id,
-        body: m.body,
+        body: rejectText(m.body) ? "Mensagem retida." : m.body,
         createdAt: m.created_at,
         mine: m.sender_id === context.userId,
       })),
@@ -1105,6 +1118,6 @@ export const listBlocks = createServerFn({ method: "GET" })
     return rows.map((r) => ({
       userId: r.user_id,
       handle: r.handle,
-      displayName: r.display_name,
+      displayName: safeName(r.display_name),
     }));
   });
