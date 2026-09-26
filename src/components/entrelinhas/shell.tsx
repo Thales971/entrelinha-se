@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Layers, Mail, Plus, UserRound } from "lucide-react";
 import type { AppUser } from "@/lib/auth/use-current-user";
-import { getMe, versoDoDia } from "@/lib/entrelinhas/api";
+import { getMe, publishKey, versoDoDia } from "@/lib/entrelinhas/api";
 import type { PostKind } from "@/lib/entrelinhas/model";
 import { Boot } from "@/components/entrelinhas/login-panel";
 import { Onboarding } from "@/components/entrelinhas/onboarding";
@@ -15,6 +15,7 @@ import { ChatList, ChatThread, ProfileView } from "@/components/entrelinhas/peop
 import { cx } from "@/components/entrelinhas/book-page";
 import { useLang } from "@/lib/entrelinhas/i18n";
 import { Lamp } from "@/components/entrelinhas/lamp";
+import { localPublicKey, sealOwner } from "@/lib/entrelinhas/seal";
 
 type Tab = "inicio" | "folhear" | "conversas" | "eu";
 type Overlay =
@@ -31,7 +32,9 @@ export function Shell({ user }: { user: AppUser }) {
   const [verso, setVerso] = useState<{ id: string; body: string; name: string } | null>(null);
   const [feedMode, setFeedMode] = useState<"all" | "following">("all");
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const [sealLost, setSealLost] = useState(false);
   const { t } = useLang();
+  sealOwner(user.id);
 
   useEffect(() => {
     let live = true;
@@ -53,6 +56,20 @@ export function Shell({ user }: { user: AppUser }) {
     };
   }, [tick]);
 
+  useEffect(() => {
+    if (!bundle?.profile.userId) return;
+    let live = true;
+    localPublicKey()
+      .then((publicKey) => publishKey({ data: { publicKey } }))
+      .then((res) => {
+        if (live && res.ok) setSealLost(res.mismatch);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [bundle?.profile.userId]);
+
   if (bundle === undefined) return <Boot />;
   if (!bundle) return <Onboarding user={user} onDone={() => setTick((n) => n + 1)} />;
 
@@ -71,7 +88,7 @@ export function Shell({ user }: { user: AppUser }) {
     <DeskProvider value={api}>
       <div className="relative flex h-full min-h-0 flex-col">
         {tab === "inicio" && !overlay ? (
-          <header className="topbar px-4 pb-3 pt-4">
+          <header className="topbar joined px-4 pt-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">{t("shelf")}</p>
               <div className="flex items-center gap-2">
@@ -93,14 +110,17 @@ export function Shell({ user }: { user: AppUser }) {
             ) : null}
           </header>
         ) : !overlay ? (
-          <div className="flex justify-end px-3 pt-3">
+          <header className="shelf-lip">
+            <p className="font-serif text-2xl">
+              {tab === "folhear" ? t("navFlip") : tab === "conversas" ? t("navLetters") : t("navMe")}
+            </p>
             <Lamp />
-          </div>
+          </header>
         ) : null}
         <div className="min-h-0 flex-1">
           {tab === "inicio" ? <Feed mode={feedMode} /> : null}
           {tab === "folhear" ? <Folhear /> : null}
-          {tab === "conversas" ? <ChatList /> : null}
+          {tab === "conversas" ? <ChatList sealLost={sealLost} /> : null}
           {tab === "eu" ? <ProfileView userId={user.id} /> : null}
         </div>
         <nav className="nav-bar grid grid-cols-5 place-items-center px-2 pt-2">
@@ -139,7 +159,7 @@ export function Shell({ user }: { user: AppUser }) {
         {overlay?.type === "post" ? <PostSheet id={overlay.id} onClose={() => setOverlay(null)} /> : null}
         {overlay?.type === "story" ? <StoryViewer userId={overlay.userId} onClose={() => { setOverlay(null); setTick((n) => n + 1); }} /> : null}
         {overlay?.type === "chat" ? (
-          <ChatThread conversationId={overlay.conversationId} title={overlay.title} onClose={() => setOverlay(null)} />
+          <ChatThread conversationId={overlay.conversationId} title={overlay.title} sealLost={sealLost} onClose={() => setOverlay(null)} />
         ) : null}
         {overlay?.type === "user" ? (
           <div className="sheet sheet-wood">

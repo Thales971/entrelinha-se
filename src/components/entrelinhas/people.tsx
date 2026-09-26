@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, Mail, Send } from "lucide-react";
+import { ChevronLeft, Lock, Mail, Send } from "lucide-react";
 import {
   getProfile,
   listBlocks,
@@ -27,6 +27,8 @@ import { BookPage, InkPicker, MoldPicker, Portrait } from "@/components/entrelin
 import { LangSwitch, useLang } from "@/lib/entrelinhas/i18n";
 import { translateLines } from "@/lib/entrelinhas/translate";
 import { useDesk } from "@/components/entrelinhas/desk";
+import { rejectText } from "@/lib/entrelinhas/guard";
+import { openLetter, sealLetter } from "@/lib/entrelinhas/seal";
 import { UserButton } from "@/lib/auth/gates";
 
 export function ProfileView({ userId, onClose }: { userId: string; onClose?: () => void }) {
@@ -350,7 +352,30 @@ function dayLabel(iso: string) {
   return date.toLocaleDateString();
 }
 
-export function ChatList() {
+function LetterPreview({ row, fallback }: { row: ChatPreview; fallback: string }) {
+  const [text, setText] = useState(row.lastBody || fallback);
+  useEffect(() => {
+    if (!row.lastCipher) {
+      setText(row.lastBody || fallback);
+      return;
+    }
+    let live = true;
+    openLetter(row.lastCipher, row.publicKey, row.lastMine).then((clear) => {
+      if (live) setText(clear || fallback);
+    });
+    return () => {
+      live = false;
+    };
+  }, [row.lastCipher, row.lastBody, row.lastMine, row.publicKey, fallback]);
+  return (
+    <span className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-cream/70">
+      {row.lastCipher ? <Lock className="size-3 shrink-0" /> : null}
+      <span className="truncate">{text}</span>
+    </span>
+  );
+}
+
+export function ChatList({ sealLost }: { sealLost: boolean }) {
   const desk = useDesk();
   const { t } = useLang();
   const [rows, setRows] = useState<ChatPreview[] | null>(null);
@@ -376,8 +401,7 @@ export function ChatList() {
   if (!rows) return <p className="px-5 py-10 font-serif text-cream">{t("openingLetters")}</p>;
   return (
     <div className="h-full overflow-y-auto px-4 py-4 text-cream">
-      <h2 className="font-serif text-4xl">{t("letters")}</h2>
-      <p className="mt-2 max-w-sm text-sm text-cream/75">{t("letterHint")}</p>
+      <p className="max-w-sm text-sm text-cream/75">{sealLost ? t("sealLost") : t("letterHint")}</p>
       {rows.length === 0 ? <p className="mt-4 font-serif text-xl">{t("noLetters")}</p> : null}
       <ul className="mt-4 space-y-2">
         {rows.map((row) => (
@@ -389,7 +413,7 @@ export function ChatList() {
                   <span className="truncate font-semibold">{row.penName || row.displayName}</span>
                   <span className="shrink-0 text-xs text-cream/60">{clock(row.lastAt)}</span>
                 </span>
-                <span className="mt-0.5 block truncate text-sm text-cream/70">{row.lastBody || t("letterOpen")}</span>
+                <LetterPreview row={row} fallback={t("letterOpen")} />
               </span>
               <span className="letter-open">{t("openLetter")}</span>
             </button>
@@ -417,9 +441,21 @@ export function ChatList() {
   );
 }
 
-export function ChatThread({ conversationId, title, onClose }: { conversationId: string; title: string; onClose: () => void }) {
+export function ChatThread({
+  conversationId,
+  title,
+  sealLost,
+  onClose,
+}: {
+  conversationId: string;
+  title: string;
+  sealLost: boolean;
+  onClose: () => void;
+}) {
   const { t, lang } = useLang();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [plain, setPlain] = useState<Record<string, string>>({});
+  const [otherKey, setOtherKey] = useState("");
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [freshId, setFreshId] = useState("");
@@ -427,9 +463,19 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
   const end = useRef<HTMLDivElement>(null);
 
   function load() {
-    listMessages({ data: { conversationId } }).then((res) => {
+    listMessages({ data: { conversationId } }).then(async (res) => {
       setMessages(res.messages);
+      setOtherKey(res.otherKey || "");
       if (res.error) setError(res.error);
+      const next: Record<string, string> = {};
+      for (const message of res.messages) {
+        if (!message.cipher) {
+          next[message.id] = message.body;
+          continue;
+        }
+        next[message.id] = (await openLetter(message.cipher, res.otherKey || "", message.mine)) || t("sealedLetter");
+      }
+      setPlain(next);
     }).catch(() => setError("Não deu pra abrir a carta."));
   }
 
@@ -454,7 +500,7 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
         <Portrait name={title} />
         <div className="min-w-0">
           <h2 className="truncate font-serif text-xl leading-none">{title}</h2>
-          <p className="mt-1 text-xs text-cream/70">{t("letterOpen")}</p>
+          <p className="mt-1 flex items-center gap-1 text-xs text-cream/70"><Lock className="size-3" /> {t("sealedNote")}</p>
         </div>
       </header>
       <div className="chat-wall min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
@@ -473,7 +519,7 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
               {showDay && day ? <p className="chat-day">{day}</p> : null}
               <div className={message.mine ? "bubble-me" : "bubble-them"}>
                 {message.id === freshId ? <span className="wax-pop" aria-hidden="true" /> : null}
-                <p>{alts[message.id] || message.body}</p>
+                <p>{alts[message.id] || plain[message.id] || message.body}</p>
                 <span className="bubble-meta">
                   <button
                     type="button"
@@ -486,8 +532,9 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
                         });
                         return;
                       }
+                      const source = plain[message.id] || message.body;
                       const target = lang === "pt" ? "en" : lang;
-                      void translateLines({ data: { target, texts: [message.body] } }).then((res) => {
+                      void translateLines({ data: { target, texts: [source] } }).then((res) => {
                         if (res.ok && res.lines[0] && res.lines[0] !== message.body) {
                           setAlts((prev) => ({ ...prev, [message.id]: res.lines[0] }));
                         }
@@ -512,17 +559,36 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
           event.preventDefault();
           const body = text.trim();
           if (!body) return;
+          if (sealLost) {
+            setError(t("sealLost"));
+            return;
+          }
+          if (!otherKey) {
+            setError(t("sealOther"));
+            return;
+          }
+          const dirty = rejectText(body);
+          if (dirty) {
+            setError(dirty);
+            return;
+          }
           setText("");
           setError("");
-          void sendMessage({ data: { conversationId, body } }).then((res) => {
-            if (!res.ok) {
-              setError(res.error);
+          void sealLetter(body, otherKey)
+            .then((cipher) => sendMessage({ data: { conversationId, cipher } }))
+            .then((res) => {
+              if (!res.ok) {
+                setError(res.error);
+                setText(body);
+                return;
+              }
+              setFreshId(res.id);
+              load();
+            })
+            .catch(() => {
+              setError(t("sealFail"));
               setText(body);
-              return;
-            }
-            setFreshId(res.id);
-            load();
-          });
+            });
         }}
       >
         <input className="field chat-input" placeholder={t("writeHere")} value={text} onChange={(event) => setText(event.target.value)} />

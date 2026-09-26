@@ -941,6 +941,24 @@ export const listStoryTray = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     const me = context.userId;
+    const liveCasa = await sql`select id from stories where user_id = 'casa' and expires_at > now() limit 1`;
+    if (!liveCasa.length) {
+      await sql`delete from story_views where story_id in ('casa-story-mesa', 'casa-story-frase')`;
+      const house = [
+        ["casa-story-mesa", "Escreve como quem deixa o livro aberto na mesa."],
+        ["casa-story-frase", "Uma frase curta também cabe numa história."],
+      ] as const;
+      for (const [id, body] of house) {
+        await sql`
+          insert into stories (id, user_id, body, mold_id, expires_at)
+          values (${id}, 'casa', ${body}, 'creme', now() + make_interval(hours => 24))
+          on conflict (id) do update set
+            body = excluded.body,
+            created_at = now(),
+            expires_at = now() + make_interval(hours => 24)
+        `;
+      }
+    }
     const people = await sql<{
       user_id: string;
       handle: string;
@@ -1054,7 +1072,7 @@ export const createStory = createServerFn({ method: "POST" })
     const id = crypto.randomUUID();
     await sql`
       insert into stories (id, user_id, body, mold_id, expires_at)
-      values (${id}, ${me}, ${data.body}, ${data.moldId}, now() + interval '24 hours')
+      values (${id}, ${me}, ${data.body}, ${data.moldId}, now() + make_interval(hours => 24))
     `;
     await markPace(sql, me, "story");
     return { ok: true as const, id };
@@ -1085,6 +1103,22 @@ export const deleteStory = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const publishKey = createServerFn({ method: "POST" })
+  .validator((input: unknown) => ({ publicKey: clip(asRecord(input).publicKey, 800) }))
+  .middleware([authMiddleware])
+  .handler(async ({ context, data }) => {
+    if (!/^[A-Za-z0-9+/=]+$/.test(data.publicKey) || data.publicKey.length < 80) return err("Chave inválida.");
+    const sql = await getSql();
+    const rows = await sql<{ public_key: string }>`select public_key from profiles where user_id = ${context.userId}`;
+    if (!rows.length) return err("Termina o cadastro antes.");
+    const current = rows[0].public_key ?? "";
+    if (current && current !== data.publicKey) return { ok: true as const, publicKey: current, mismatch: true as const };
+    if (!current) {
+      await sql`update profiles set public_key = ${data.publicKey} where user_id = ${context.userId}`;
+    }
+    return { ok: true as const, publicKey: data.publicKey, mismatch: false as const };
+  });
+
 export const listConversations = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -1096,18 +1130,33 @@ export const listConversations = createServerFn({ method: "GET" })
       handle: string;
       display_name: string;
       pen_name: string;
+      public_key: string;
       last_body: string;
+      last_cipher: string;
+      last_sender: string;
       last_at: string;
     }>`
       select c.id,
         case when c.user_a = ${me} then c.user_b else c.user_a end as other_id,
-        p.handle, p.display_name, p.pen_name,
+        p.handle, p.display_name, p.pen_name, p.public_key,
         coalesce((
           select m.body from messages m
           where m.conversation_id = c.id
           order by m.created_at desc
           limit 1
         ), '') as last_body,
+        coalesce((
+          select m.cipher from messages m
+          where m.conversation_id = c.id
+          order by m.created_at desc
+          limit 1
+        ), '') as last_cipher,
+        coalesce((
+          select m.sender_id from messages m
+          where m.conversation_id = c.id
+          order by m.created_at desc
+          limit 1
+        ), '') as last_sender,
         coalesce((
           select to_char(m.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
           from messages m
@@ -1135,8 +1184,11 @@ export const listConversations = createServerFn({ method: "GET" })
       handle: r.handle,
       displayName: safeName(r.display_name),
       penName: rejectText(r.pen_name) ? "" : r.pen_name,
-      lastBody: rejectText(r.last_body) ? "Mensagem retida." : r.last_body,
+      lastBody: r.last_cipher ? "" : rejectText(r.last_body) ? "Mensagem retida." : r.last_body,
+      lastCipher: r.last_cipher ?? "",
+      lastMine: r.last_sender === me,
       lastAt: r.last_at,
+      publicKey: r.public_key ?? "",
     }));
     return chats;
   });
@@ -1193,18 +1245,20 @@ export const listMessages = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
     const other = await memberOf(data.conversationId, context.userId);
-    if (!other) return { messages: [] as ChatMessage[], error: "Conversa fechada." };
+    if (!other) return { messages: [] as ChatMessage[], otherKey: "", error: "Conversa fechada." };
     if (await isBlocked(context.userId, other)) {
-      return { messages: [] as ChatMessage[], error: "Conversa bloqueada." };
+      return { messages: [] as ChatMessage[], otherKey: "", error: "Conversa bloqueada." };
     }
     const sql = await getSql();
+    const keyRows = await sql<{ public_key: string }>`select public_key from profiles where user_id = ${other}`;
     const rows = await sql<{
       id: string;
       sender_id: string;
       body: string;
+      cipher: string;
       created_at: string;
     }>`
-      select id, sender_id, body,
+      select id, sender_id, body, cipher,
         to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at
       from (
         select * from messages
@@ -1218,10 +1272,12 @@ export const listMessages = createServerFn({ method: "POST" })
       messages: rows.map((m) => ({
         id: m.id,
         senderId: m.sender_id,
-        body: rejectText(m.body) ? "Mensagem retida." : m.body,
+        body: m.cipher ? "" : rejectText(m.body) ? "Mensagem retida." : m.body,
+        cipher: m.cipher ?? "",
         createdAt: m.created_at,
         mine: m.sender_id === context.userId,
       })),
+      otherKey: keyRows[0]?.public_key ?? "",
       error: "",
     };
   });
@@ -1229,13 +1285,18 @@ export const listMessages = createServerFn({ method: "POST" })
 export const sendMessage = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const o = asRecord(input);
-    return { conversationId: clip(o.conversationId, 80), body: clip(o.body, 1000) };
+    return { conversationId: clip(o.conversationId, 80), cipher: clip(o.cipher, 8000) };
   })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
-    if (!data.body) return err("Mensagem vazia.");
-    const dirty = rejectText(data.body);
-    if (dirty) return err(dirty);
+    if (!data.cipher.startsWith("{") || !data.cipher.endsWith("}")) return err("A carta precisa ir lacrada.");
+    let packed: { v?: number; forThem?: string; forMe?: string; iv?: string };
+    try {
+      packed = JSON.parse(data.cipher) as { v?: number; forThem?: string; forMe?: string; iv?: string };
+    } catch {
+      return err("A carta precisa ir lacrada.");
+    }
+    if (packed.v !== 1 || !packed.forThem || !packed.forMe || !packed.iv) return err("A carta precisa ir lacrada.");
     const other = await memberOf(data.conversationId, context.userId);
     if (!other) return err("Conversa fechada.");
     if (await isBlocked(context.userId, other)) return err("Não dá pra enviar.");
@@ -1244,8 +1305,8 @@ export const sendMessage = createServerFn({ method: "POST" })
     if (slow) return err(slow);
     const id = crypto.randomUUID();
     await sql`
-      insert into messages (id, conversation_id, sender_id, body)
-      values (${id}, ${data.conversationId}, ${context.userId}, ${data.body})
+      insert into messages (id, conversation_id, sender_id, body, cipher)
+      values (${id}, ${data.conversationId}, ${context.userId}, '', ${data.cipher})
     `;
     await markPace(sql, context.userId, "message");
     return { ok: true as const, id };

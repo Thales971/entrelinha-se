@@ -109,18 +109,18 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
   );
 }
 
-export function StoryTray({ tray }: { tray: TrayPerson[] }) {
+export function StoryTray({ tray, onPaper = false }: { tray: TrayPerson[]; onPaper?: boolean }) {
   const desk = useDesk();
   const { t } = useLang();
   const mine = tray.find((p) => p.userId === desk.meId);
+  const label = onPaper ? "text-ink-soft" : "text-cream";
   return (
-    <div className="flex gap-3 overflow-x-auto px-4 pb-3 pt-4 no-scrollbar">
+    <div className="flex gap-3 overflow-x-auto px-4 pb-3 pt-2 no-scrollbar">
       <button
         type="button"
         className="relative flex w-16 shrink-0 flex-col items-center"
         onClick={() => (mine?.stories.length ? desk.openStory(desk.meId) : desk.openCompose("story"))}
       >
-        {mine?.note ? <span className="note-chip">{mine.note}</span> : null}
         <span className={cx("story-ring", mine?.stories.some((s) => !s.seen) && "story-ring-new")}>
           <span className="story-face">
             {mine?.avatarData ? (
@@ -132,20 +132,28 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
             )}
           </span>
         </span>
-        <span className="mt-1 text-xs text-cream">{t("yours")}</span>
+        <span
+          className="story-plus"
+          role="presentation"
+          onClick={(event) => {
+            event.stopPropagation();
+            desk.openCompose("story");
+          }}
+        >
+          <Plus className="size-3" />
+        </span>
+        <span className={cx("mt-1 text-xs", label)}>{mine?.stories.length ? t("yours") : t("storyAdd")}</span>
       </button>
       {tray.map((person) => {
+        if (person.userId === desk.meId || !person.stories.length) return null;
         const unseen = person.stories.some((s) => !s.seen);
-        const mine = person.userId === desk.meId;
-        if (mine) return null;
         return (
           <button
             key={person.userId}
             type="button"
             className="relative flex w-16 shrink-0 flex-col items-center"
-            onClick={() => person.stories.length && desk.openStory(person.userId)}
+            onClick={() => desk.openStory(person.userId)}
           >
-            {person.note ? <span className="note-chip">{person.note}</span> : null}
             <span className={cx("story-ring", unseen && "story-ring-new")}>
               <span className="story-face">
                 {person.avatarData ? (
@@ -155,7 +163,7 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
                 )}
               </span>
             </span>
-            <span className="mt-1 max-w-16 truncate text-xs text-cream">{person.handle}</span>
+            <span className={cx("mt-1 max-w-16 truncate text-xs", label)}>{person.handle}</span>
           </button>
         );
       })}
@@ -224,7 +232,11 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
   const mine = tray.find((p) => p.userId === desk.meId);
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="story-dock">
+        <StoryTray tray={tray} onPaper />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="px-4 pt-3">
         <label className="search-pill flex items-center gap-2 rounded-full bg-paper px-3 text-ink">
           <Search className="size-4 text-ink-soft" />
@@ -236,7 +248,6 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
           />
         </label>
       </div>
-      <StoryTray tray={tray} />
       {mine?.note ? <p className="px-4 pb-2 text-xs text-cream/70">Sua nota: {mine.note}</p> : null}
       {people.length ? (
         <div className="space-y-1 px-4 pb-3">
@@ -262,6 +273,7 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
       {posts?.map((post) => (
         <PostCardView key={`${post.id}-${post.reposterHandle || "origem"}`} post={post} />
       ))}
+      </div>
     </div>
   );
 }

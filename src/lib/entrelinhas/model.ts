@@ -131,7 +131,10 @@ export type ChatPreview = {
   displayName: string;
   penName: string;
   lastBody: string;
+  lastCipher: string;
+  lastMine: boolean;
   lastAt: string;
+  publicKey: string;
 };
 
 export type ChatMessage = {
@@ -140,6 +143,7 @@ export type ChatMessage = {
   body: string;
   createdAt: string;
   mine: boolean;
+  cipher: string;
 };
 
 export type CommentItem = {

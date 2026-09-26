@@ -216,7 +216,8 @@ html[data-lamp="night"] .boot-book {
   border: 1px solid color-mix(in srgb, var(--color-cream) 35%, transparent);
 }
 .lamp-btn.on-paper,
-.topbar .lamp-btn {
+.topbar .lamp-btn,
+.shelf-lip .lamp-btn {
   background: color-mix(in srgb, var(--color-ink) 8%, var(--color-paper));
   color: var(--color-ink);
   border-color: color-mix(in srgb, var(--color-ink) 16%, transparent);
@@ -355,11 +356,49 @@ html[data-lamp="night"] .lamp-btn {
   border-radius: 999px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-serif);
   font-size: 1.15rem;
   border: 2px solid var(--color-paper);
+}
+.story-face img {
+  width: 100%;
+  height: 100%;
+}
+.story-plus {
+  position: absolute;
+  top: 2.35rem;
+  right: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--color-seal);
+  color: #f3eadc;
+  border: 2px solid var(--color-paper);
+}
+.story-bar {
+  height: 0.28rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-ink) 18%, transparent);
+}
+.story-stage { touch-action: none; }
+.story-pause {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0.28rem;
+  height: 1.35rem;
+  translate: -50% -50%;
+  background: currentColor;
+  opacity: 0.45;
+  box-shadow: 0.65rem 0 0 currentColor;
+  pointer-events: none;
 }
 .note-chip {
   position: absolute;
@@ -495,14 +534,44 @@ html[data-lamp="night"] .lamp-btn {
   font-weight: 700;
 }
 
+.topbar.joined {
+  border-bottom: none;
+  padding-bottom: 0;
+  box-shadow: none;
+}
+.shelf-lip {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex: none;
+  padding: 0.85rem 1rem 0.8rem;
+  background: color-mix(in srgb, var(--color-paper) 92%, var(--color-leather));
+  color: var(--color-ink);
+  border-bottom-left-radius: 1.45rem;
+  border-bottom-right-radius: 1.45rem;
+  box-shadow: 0 16px 22px rgba(20, 12, 8, 0.18);
+}
+.story-dock {
+  flex: none;
+  margin-top: -1px;
+  padding-bottom: 0.45rem;
+  background: color-mix(in srgb, var(--color-paper) 92%, var(--color-leather));
+  color: var(--color-ink);
+  border-bottom-left-radius: 1.45rem;
+  border-bottom-right-radius: 1.45rem;
+  box-shadow: 0 16px 22px rgba(20, 12, 8, 0.18);
+}
 .verso-slip {
-  margin-top: 0.7rem;
+  margin-top: 0.85rem;
   display: block;
   width: 100%;
   text-align: left;
-  border-radius: 0.4rem 0.9rem 0.9rem 0.35rem;
-  background: color-mix(in srgb, var(--color-paper) 72%, transparent);
-  padding: 0.55rem 0.75rem;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink);
+  padding: 0.7rem 0 0.15rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-seal) 32%, transparent);
 }
 .verso-slip p {
   font-family: var(--font-serif);
