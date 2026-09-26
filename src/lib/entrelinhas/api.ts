@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { getSql } from "@/lib/db";
+import { acceptImage, markPace, pace, rejectText } from "@/lib/entrelinhas/guard";
 import {
   INK_IDS,
   KIND_META,
@@ -34,7 +35,10 @@ function asRecord(input: unknown): Record<string, unknown> {
 
 function clip(value: unknown, max: number): string {
   if (typeof value !== "string") return "";
-  return value.replace(/\u0000/g, "").trim().slice(0, max);
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+    .trim()
+    .slice(0, max);
 }
 
 function num(value: unknown): number {
@@ -59,17 +63,9 @@ function alignOf(value: unknown, kind: PostKind): "left" | "center" {
   return kind === "frase" || kind === "nota" ? "center" : "left";
 }
 
-function safeImage(value: unknown): string {
-  if (typeof value !== "string" || !value) return "";
-  if (value.length > 120_000) return "";
-  if (
-    !value.startsWith("data:image/jpeg;base64,") &&
-    !value.startsWith("data:image/png;base64,") &&
-    !value.startsWith("data:image/webp;base64,")
-  ) {
-    return "";
-  }
-  return value;
+function duplicate(error: unknown) {
+  const msg = error instanceof Error ? error.message.toLowerCase() : "";
+  return msg.includes("unique") || msg.includes("duplicate");
 }
 
 function err(error: string) {
@@ -186,6 +182,13 @@ async function loadBundle(viewerId: string, userId: string) {
     from posts p
     join profiles pr on pr.user_id = p.user_id
     where p.user_id = ${userId}
+      and (
+        p.user_id = ${viewerId}
+        or (
+          select count(distinct r2.reporter_id)::int from reports r2
+          where r2.target_type = 'post' and r2.target_id = p.id
+        ) < 3
+      )
       and not exists (
         select 1 from reports r
         where r.reporter_id = ${viewerId} and r.target_type = 'post' and r.target_id = p.id
@@ -249,8 +252,12 @@ export const saveProfile = createServerFn({ method: "POST" })
     }
     if (RESERVED.has(data.handle)) return err("Esse @ já é da casa.");
     if (data.displayName.length < 2) return err("Falta o nome que aparece na capa.");
+    const dirty = rejectText(data.handle, data.displayName, data.penName, data.bio, data.noteText);
+    if (dirty) return err(dirty);
     const sql = await getSql();
     const me = context.userId;
+    const slow = await pace(sql, me, "profile");
+    if (slow) return err(slow);
     const existing = await sql<{ handle: string; accepted_terms_at: string | null }>`
       select handle, accepted_terms_at::text as accepted_terms_at from profiles where user_id = ${me}
     `;
@@ -262,35 +269,41 @@ export const saveProfile = createServerFn({ method: "POST" })
       return err("Aceita as regras do caderno pra entrar.");
     }
     const pen = data.penName || data.displayName;
-    if (!existing.length) {
-      await sql`
-        insert into profiles (
-          user_id, handle, display_name, pen_name, bio, mold_id, ink_id, note_text, note_updated_at, accepted_terms_at
-        ) values (
-          ${me}, ${data.handle}, ${data.displayName}, ${pen}, ${data.bio},
-          ${data.moldId}, ${data.inkId}, ${data.noteText},
-          case when ${data.noteText} = '' then null else now() end,
-          now()
-        )
-      `;
-    } else {
-      await sql`
-        update profiles set
-          handle = ${data.handle},
-          display_name = ${data.displayName},
-          pen_name = ${pen},
-          bio = ${data.bio},
-          mold_id = ${data.moldId},
-          ink_id = ${data.inkId},
-          note_text = ${data.noteText},
-          note_updated_at = case
-            when note_text is distinct from ${data.noteText} then now()
-            else note_updated_at
-          end,
-          accepted_terms_at = coalesce(accepted_terms_at, case when ${data.acceptTerms} then now() else null end)
-        where user_id = ${me}
-      `;
+    try {
+      if (!existing.length) {
+        await sql`
+          insert into profiles (
+            user_id, handle, display_name, pen_name, bio, mold_id, ink_id, note_text, note_updated_at, accepted_terms_at
+          ) values (
+            ${me}, ${data.handle}, ${data.displayName}, ${pen}, ${data.bio},
+            ${data.moldId}, ${data.inkId}, ${data.noteText},
+            case when ${data.noteText} = '' then null else now() end,
+            now()
+          )
+        `;
+      } else {
+        await sql`
+          update profiles set
+            handle = ${data.handle},
+            display_name = ${data.displayName},
+            pen_name = ${pen},
+            bio = ${data.bio},
+            mold_id = ${data.moldId},
+            ink_id = ${data.inkId},
+            note_text = ${data.noteText},
+            note_updated_at = case
+              when note_text is distinct from ${data.noteText} then now()
+              else note_updated_at
+            end,
+            accepted_terms_at = coalesce(accepted_terms_at, case when ${data.acceptTerms} then now() else null end)
+          where user_id = ${me}
+        `;
+      }
+    } catch (error) {
+      if (duplicate(error)) return err("Esse @ já está em outro caderno.");
+      throw error;
     }
+    await markPace(sql, me, "profile");
     return { ok: true as const };
   });
 
@@ -326,6 +339,13 @@ export const listFeed = createServerFn({ method: "POST" })
         and not exists (
           select 1 from reports r
           where r.reporter_id = ${me} and r.target_type = 'post' and r.target_id = p.id
+        )
+        and (
+          p.user_id = ${me}
+          or (
+            select count(distinct r2.reporter_id)::int from reports r2
+            where r2.target_type = 'post' and r2.target_id = p.id
+          ) < 3
         )
         and (
           ${data.mode} <> 'following'
@@ -433,7 +453,7 @@ export const createPost = createServerFn({ method: "POST" })
       citedAuthor: clip(o.citedAuthor, 80),
       songTitle: clip(o.songTitle, 80),
       artist: clip(o.artist, 80),
-      coverData: safeImage(o.coverData),
+      coverData: typeof o.coverData === "string" ? o.coverData.slice(0, 120_000) : "",
       moldId: moldOf(o.moldId),
       inkId: inkOf(o.inkId),
       align: o.align === "center" || o.align === "left" ? o.align : "",
@@ -458,13 +478,21 @@ export const createPost = createServerFn({ method: "POST" })
         return err("Na música, coloca o nome e o artista.");
       }
     }
+    const dirty = rejectText(data.title, body, data.citedAuthor, data.songTitle, data.artist);
+    if (dirty) return err(dirty);
+    let cover = "";
+    if (data.kind === "musica" && data.coverData) {
+      cover = acceptImage(data.coverData);
+      if (!cover) return err("A capa precisa ser jpg, png ou webp, e pequena.");
+    }
     const sql = await getSql();
     const me = context.userId;
+    const slow = await pace(sql, me, "post");
+    if (slow) return err(slow);
     const prof = await sql<{ user_id: string }>`select user_id from profiles where user_id = ${me}`;
     if (!prof.length) return err("Termina o cadastro antes de publicar.");
     const id = crypto.randomUUID();
     const align = alignOf(data.align, data.kind);
-    const cover = data.kind === "musica" ? data.coverData : "";
     await sql`
       insert into posts (
         id, user_id, kind, title, body, cited_author, song_title, artist, cover_data, mold_id, ink_id, align
@@ -475,6 +503,7 @@ export const createPost = createServerFn({ method: "POST" })
         ${cover}, ${data.moldId}, ${data.inkId}, ${align}
       )
     `;
+    await markPace(sql, me, "post");
     return { ok: true as const, id };
   });
 
@@ -506,6 +535,8 @@ export const toggleLike = createServerFn({ method: "POST" })
     const post = await sql<{ user_id: string }>`select user_id from posts where id = ${data.id}`;
     if (!post[0]) return err("Essa página sumiu.");
     if (await isBlocked(me, post[0].user_id)) return err("Não dá pra curtir quem você bloqueou.");
+    const slow = await pace(sql, me, "like");
+    if (slow) return err(slow);
     const existing = await sql<{ ok: number }>`
       select 1 as ok from likes where post_id = ${data.id} and user_id = ${me}
     `;
@@ -517,6 +548,7 @@ export const toggleLike = createServerFn({ method: "POST" })
     const count = await sql<{ n: number }>`
       select count(*)::int as n from likes where post_id = ${data.id}
     `;
+    await markPace(sql, me, "like");
     return { ok: true as const, liked: existing.length === 0, likeCount: num(count[0]?.n) };
   });
 
@@ -538,6 +570,13 @@ export const getPost = createServerFn({ method: "GET" })
       from posts p
       join profiles pr on pr.user_id = p.user_id
       where p.id = ${data.id}
+        and (
+          p.user_id = ${me}
+          or (
+            select count(distinct r2.reporter_id)::int from reports r2
+            where r2.target_type = 'post' and r2.target_id = p.id
+          ) < 3
+        )
         and not exists (
           select 1 from blocks b
           where (b.blocker_id = ${me} and b.blocked_id = p.user_id)
@@ -561,6 +600,13 @@ export const getPost = createServerFn({ method: "GET" })
       from comments c
       join profiles pr on pr.user_id = c.user_id
       where c.post_id = ${data.id}
+        and (
+          c.user_id = ${me}
+          or (
+            select count(distinct r2.reporter_id)::int from reports r2
+            where r2.target_type = 'comment' and r2.target_id = c.id
+          ) < 3
+        )
         and not exists (
           select 1 from blocks b
           where (b.blocker_id = ${me} and b.blocked_id = c.user_id)
@@ -592,8 +638,12 @@ export const addComment = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
     if (!data.postId || !data.body) return err("Escreve alguma coisa na margem.");
+    const dirty = rejectText(data.body);
+    if (dirty) return err(dirty);
     const sql = await getSql();
     const me = context.userId;
+    const slow = await pace(sql, me, "comment");
+    if (slow) return err(slow);
     const prof = await sql`select user_id from profiles where user_id = ${me}`;
     if (!prof.length) return err("Termina o cadastro antes.");
     const post = await sql<{ user_id: string }>`select user_id from posts where id = ${data.postId}`;
@@ -603,6 +653,7 @@ export const addComment = createServerFn({ method: "POST" })
     await sql`
       insert into comments (id, post_id, user_id, body) values (${id}, ${data.postId}, ${me}, ${data.body})
     `;
+    await markPace(sql, me, "comment");
     return { ok: true as const, id };
   });
 
@@ -632,7 +683,10 @@ export const toggleFollow = createServerFn({ method: "POST" })
       await sql`delete from follows where follower_id = ${me} and following_id = ${data.userId}`;
       return { ok: true as const, following: false };
     }
+    const slow = await pace(sql, me, "follow");
+    if (slow) return err(slow);
     await sql`insert into follows (follower_id, following_id) values (${me}, ${data.userId})`;
+    await markPace(sql, me, "follow");
     return { ok: true as const, following: true };
   });
 
@@ -693,6 +747,13 @@ export const listStoryTray = createServerFn({ method: "GET" })
           where (b.blocker_id = ${me} and b.blocked_id = s.user_id)
              or (b.blocker_id = s.user_id and b.blocked_id = ${me})
         )
+        and (
+          s.user_id = ${me}
+          or (
+            select count(distinct r2.reporter_id)::int from reports r2
+            where r2.target_type = 'story' and r2.target_id = s.id
+          ) < 3
+        )
       order by s.created_at asc
     `;
     const byUser = new Map<string, StoryItem[]>();
@@ -734,8 +795,12 @@ export const createStory = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
     if (data.body.length < 1) return err("A história está em branco.");
+    const dirty = rejectText(data.body);
+    if (dirty) return err(dirty);
     const sql = await getSql();
     const me = context.userId;
+    const slow = await pace(sql, me, "story");
+    if (slow) return err(slow);
     const prof = await sql`select user_id from profiles where user_id = ${me}`;
     if (!prof.length) return err("Termina o cadastro antes.");
     const id = crypto.randomUUID();
@@ -743,6 +808,7 @@ export const createStory = createServerFn({ method: "POST" })
       insert into stories (id, user_id, body, mold_id, expires_at)
       values (${id}, ${me}, ${data.body}, ${data.moldId}, now() + interval '24 hours')
     `;
+    await markPace(sql, me, "story");
     return { ok: true as const, id };
   });
 
@@ -764,7 +830,9 @@ export const deleteStory = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
     const sql = await getSql();
-    await sql`delete from story_views where story_id = ${data.id}`;
+    await sql`delete from story_views where story_id = ${data.id} and exists (
+      select 1 from stories s where s.id = ${data.id} and s.user_id = ${context.userId}
+    )`;
     await sql`delete from stories where id = ${data.id} and user_id = ${context.userId}`;
     return { ok: true as const };
   });
@@ -842,10 +910,22 @@ export const openConversation = createServerFn({ method: "POST" })
       select id from conversations where user_a = ${userA} and user_b = ${userB}
     `;
     if (existing[0]) return { ok: true as const, id: existing[0].id };
+    const slow = await pace(sql, me, "chat");
+    if (slow) return err(slow);
     const id = crypto.randomUUID();
-    await sql`
-      insert into conversations (id, user_a, user_b) values (${id}, ${userA}, ${userB})
-    `;
+    try {
+      await sql`
+        insert into conversations (id, user_a, user_b) values (${id}, ${userA}, ${userB})
+      `;
+    } catch (error) {
+      if (!duplicate(error)) throw error;
+      const again = await sql<{ id: string }>`
+        select id from conversations where user_a = ${userA} and user_b = ${userB}
+      `;
+      if (again[0]) return { ok: true as const, id: again[0].id };
+      return err("Não deu pra abrir a conversa.");
+    }
+    await markPace(sql, me, "chat");
     return { ok: true as const, id };
   });
 
@@ -906,15 +986,20 @@ export const sendMessage = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
     if (!data.body) return err("Mensagem vazia.");
+    const dirty = rejectText(data.body);
+    if (dirty) return err(dirty);
     const other = await memberOf(data.conversationId, context.userId);
     if (!other) return err("Conversa fechada.");
     if (await isBlocked(context.userId, other)) return err("Não dá pra enviar.");
     const sql = await getSql();
+    const slow = await pace(sql, context.userId, "message");
+    if (slow) return err(slow);
     const id = crypto.randomUUID();
     await sql`
       insert into messages (id, conversation_id, sender_id, body)
       values (${id}, ${data.conversationId}, ${context.userId}, ${data.body})
     `;
+    await markPace(sql, context.userId, "message");
     return { ok: true as const, id };
   });
 
@@ -937,31 +1022,43 @@ export const reportContent = createServerFn({ method: "POST" })
     if (!allowed.has(data.targetType)) return err("Não dá pra denunciar isso.");
     const sql = await getSql();
     const me = context.userId;
+    const slow = await pace(sql, me, "report");
+    if (slow) return err(slow);
+    const found = await sql<{ user_id: string }>`
+      select user_id from posts where id = ${data.targetId} and ${data.targetType} = 'post'
+      union all
+      select user_id from profiles where user_id = ${data.targetId} and ${data.targetType} = 'user'
+      union all
+      select user_id from stories where id = ${data.targetId} and ${data.targetType} = 'story'
+      union all
+      select user_id from comments where id = ${data.targetId} and ${data.targetType} = 'comment'
+      union all
+      select m.sender_id as user_id
+      from messages m
+      join conversations c on c.id = m.conversation_id
+      where m.id = ${data.targetId}
+        and ${data.targetType} = 'message'
+        and (c.user_a = ${me} or c.user_b = ${me})
+    `;
+    const owner = found[0]?.user_id ?? "";
+    if (!owner) return err("Isso não está mais aqui.");
+    if (owner === me) return err("Não precisa denunciar o que é seu. Apaga.");
     await sql`
       insert into reports (id, reporter_id, target_type, target_id, reason)
       values (${crypto.randomUUID()}, ${me}, ${data.targetType}, ${data.targetId}, ${data.reason})
+      on conflict (reporter_id, target_type, target_id) do nothing
     `;
-    if (data.alsoBlock) {
-      let blocked = data.targetType === "user" ? data.targetId : "";
-      if (data.targetType === "post") {
-        const row = await sql<{ user_id: string }>`select user_id from posts where id = ${data.targetId}`;
-        blocked = row[0]?.user_id ?? "";
-      }
-      if (data.targetType === "story") {
-        const row = await sql<{ user_id: string }>`select user_id from stories where id = ${data.targetId}`;
-        blocked = row[0]?.user_id ?? "";
-      }
-      if (blocked && blocked !== me && blocked !== "casa") {
-        await sql`
-          insert into blocks (blocker_id, blocked_id) values (${me}, ${blocked})
-          on conflict do nothing
-        `;
-        await sql`
-          delete from follows
-          where (follower_id = ${me} and following_id = ${blocked})
-             or (follower_id = ${blocked} and following_id = ${me})
-        `;
-      }
+    await markPace(sql, me, "report");
+    if (data.alsoBlock && owner !== "casa") {
+      await sql`
+        insert into blocks (blocker_id, blocked_id) values (${me}, ${owner})
+        on conflict do nothing
+      `;
+      await sql`
+        delete from follows
+        where (follower_id = ${me} and following_id = ${owner})
+           or (follower_id = ${owner} and following_id = ${me})
+      `;
     }
     return { ok: true as const };
   });

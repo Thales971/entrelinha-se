@@ -26,3 +26,7 @@ npm run dev
 Abre em `http://localhost:8080`.
 
 O banco local sobe sozinho. Pra persistir de verdade em produção, o app usa Postgres pela variável `DATABASE_URL`.
+
+## Segurança
+
+Tudo que grava passa pela conta de quem está logado. O texto é filtrado no servidor: xingamento, ameaça, link, spam, e-mail, CPF e telefone não entram. Capa só se for jpg, png ou webp de verdade. Publicar, comentar, seguir e denunciar têm limite. Três denúncias de pessoas diferentes escondem a página dos outros. Conversa só abre pra quem participa. Senha não fica no código.

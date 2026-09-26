@@ -44,7 +44,8 @@ export const TERMS = [
   "Você entra com o seu nome e responde pelo que publica.",
   "Não cabe assédio, ameaça, nudez, golpe nem conteúdo ilegal.",
   "Música é só um trecho curto, de até 4 linhas, escrito por você. Sem letra inteira e sem capa oficial de álbum.",
-  "Dá para denunciar e bloquear. A denúncia fica registrada.",
+  "Dá para denunciar e bloquear. Três pessoas diferentes denunciando a mesma página escondem ela dos outros.",
+  "Xingamento, ameaça, link, spam e dado pessoal não são publicados.",
 ];
 
 export type PostCard = {
