@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Boot, LoginPanel } from "@/components/entrelinhas/login-panel";
 import { Shell } from "@/components/entrelinhas/shell";
+import { Lamp } from "@/components/entrelinhas/lamp";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -14,6 +15,7 @@ function Home() {
   return (
     <main className="desk">
       <div className="phone">
+        <Lamp />
         {!mounted || isPending ? <Boot /> : user ? <Shell user={user} /> : <LoginPanel />}
       </div>
     </main>

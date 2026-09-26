@@ -70,7 +70,7 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
     setNote(res.reposted ? "Repassada." : "");
   }
 
-  const item = layout === "rail" ? "rail-btn" : `tap flex min-h-11 items-center gap-1 px-1 ${tone === "ink" ? "text-ink" : "text-paper"}`;
+  const item = layout === "rail" ? "rail-btn" : `tap flex min-h-11 items-center gap-1 px-1 ${tone === "ink" ? "text-ink" : "text-cream"}`;
   return (
     <div className={layout === "rail" ? "flex flex-col gap-3" : "mt-2"}>
       <div className={layout === "rail" ? "flex flex-col gap-3" : "flex items-center gap-1"}>
@@ -98,12 +98,12 @@ export function PageActions({ post, layout = "row", tone = "paper" }: { post: Po
           </button>
         ) : null}
         {layout === "row" ? (
-          <button type="button" className={`tap grid size-11 place-items-center ${tone === "ink" ? "text-ink" : "text-paper"}`} aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
+          <button type="button" className={`tap grid size-11 place-items-center ${tone === "ink" ? "text-ink" : "text-cream"}`} aria-label="Guardar imagem da página" onClick={() => void downloadPage(post)}>
             <Download className="size-5" />
           </button>
         ) : null}
       </div>
-      {note ? <p className={cx("text-xs", layout === "rail" ? "sr-only" : "px-1 text-paper/80")}>{note}</p> : null}
+      {note ? <p className={cx("text-xs", layout === "rail" ? "sr-only" : "px-1 text-cream/80")}>{note}</p> : null}
     </div>
   );
 }
@@ -130,7 +130,7 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
             )}
           </span>
         </span>
-        <span className="mt-1 text-xs text-paper">Sua</span>
+        <span className="mt-1 text-xs text-cream">Sua</span>
       </button>
       {tray.map((person) => {
         const unseen = person.stories.some((s) => !s.seen);
@@ -153,7 +153,7 @@ export function StoryTray({ tray }: { tray: TrayPerson[] }) {
                 )}
               </span>
             </span>
-            <span className="mt-1 max-w-16 truncate text-xs text-paper">{person.handle}</span>
+            <span className="mt-1 max-w-16 truncate text-xs text-cream">{person.handle}</span>
           </button>
         );
       })}
@@ -166,13 +166,13 @@ export function PostCardView({ post }: { post: PostCard }) {
   return (
     <article className="page-in px-4 pb-6">
       {post.reposterHandle ? (
-        <p className="mb-1 text-xs text-paper/75">Repassada por @{post.reposterHandle}</p>
+        <p className="mb-1 text-xs text-cream/75">Repassada por @{post.reposterHandle}</p>
       ) : null}
-      <button type="button" className="mb-2 flex min-h-11 w-full items-center gap-2 text-left text-paper" onClick={() => desk.openUser(post.userId)}>
+      <button type="button" className="mb-2 flex min-h-11 w-full items-center gap-2 text-left text-cream" onClick={() => desk.openUser(post.userId)}>
         <Portrait name={post.penName || post.displayName} src={post.avatarData} />
         <span className="min-w-0">
           <span className="block truncate font-semibold">{post.penName || post.displayName}</span>
-          <span className="block text-xs text-paper/70">@{post.handle} · {ago(post.createdAt)}</span>
+          <span className="block text-xs text-cream/70">@{post.handle} · {ago(post.createdAt)}</span>
         </span>
       </button>
       <button type="button" className="block w-full text-left" onClick={() => desk.openPost(post.id)}>
@@ -180,7 +180,7 @@ export function PostCardView({ post }: { post: PostCard }) {
       </button>
       <div className="flex items-center">
         <PageActions post={post} />
-        <button type="button" className="tap flex min-h-11 items-center gap-1 px-2 text-paper" onClick={() => desk.openPost(post.id)}>
+        <button type="button" className="tap flex min-h-11 items-center gap-1 px-2 text-cream" onClick={() => desk.openPost(post.id)}>
           <MessageCircle className="size-5" />
           <span className="tabular-nums text-sm">{post.commentCount}</span>
         </button>
@@ -223,7 +223,7 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="px-4 pt-3">
-        <label className="flex items-center gap-2 rounded-full bg-paper px-3 text-ink">
+        <label className="search-pill flex items-center gap-2 rounded-full bg-paper px-3 text-ink">
           <Search className="size-4 text-ink-soft" />
           <input
             className="h-11 w-full bg-transparent outline-none"
@@ -234,26 +234,26 @@ export function Feed({ mode }: { mode: "all" | "following" }) {
         </label>
       </div>
       <StoryTray tray={tray} />
-      {mine?.note ? <p className="px-4 pb-2 text-xs text-paper/70">Sua nota: {mine.note}</p> : null}
+      {mine?.note ? <p className="px-4 pb-2 text-xs text-cream/70">Sua nota: {mine.note}</p> : null}
       {people.length ? (
         <div className="space-y-1 px-4 pb-3">
           {people.map((person) => (
-            <button key={person.userId} type="button" className="flex min-h-11 w-full items-center gap-2 text-left text-paper" onClick={() => desk.openUser(person.userId)}>
+            <button key={person.userId} type="button" className="flex min-h-11 w-full items-center gap-2 text-left text-cream" onClick={() => desk.openUser(person.userId)}>
               <Portrait name={person.displayName} />
               <span>
                 <span className="block font-semibold">{person.displayName}</span>
-                <span className="text-xs text-paper/70">@{person.handle}</span>
+                <span className="text-xs text-cream/70">@{person.handle}</span>
               </span>
             </button>
           ))}
         </div>
       ) : null}
-      {error ? <p className="px-4 text-sm text-paper">{error}</p> : null}
-      {posts === null ? <p className="px-4 py-8 font-serif text-paper">Virando a página…</p> : null}
+      {error ? <p className="px-4 text-sm text-cream">{error}</p> : null}
+      {posts === null ? <p className="px-4 py-8 font-serif text-cream">Virando a página…</p> : null}
       {posts?.length === 0 ? (
-        <div className="px-6 py-10 text-paper">
+        <div className="px-6 py-10 text-cream">
           <p className="font-serif text-3xl leading-none">A mesa está limpa.</p>
-          <p className="mt-2 text-paper/80">Publica a primeira página, ou segue alguém pra encher o feed.</p>
+          <p className="mt-2 text-cream/80">Publica a primeira página, ou segue alguém pra encher o feed.</p>
         </div>
       ) : null}
       {posts?.map((post) => (

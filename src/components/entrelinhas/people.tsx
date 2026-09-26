@@ -57,10 +57,10 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
     listShelf({ data: { shelf } }).then(setKept).catch(() => setKept([]));
   }, [shelf, userId, desk.meId, desk.tick]);
 
-  if (bundle === undefined) return <p className="px-5 py-10 font-serif text-2xl text-paper">Abrindo o caderno…</p>;
+  if (bundle === undefined) return <p className="px-5 py-10 font-serif text-2xl text-cream">Abrindo o caderno…</p>;
   if (!bundle) {
     return (
-      <div className="px-5 py-10 text-paper">
+      <div className="px-5 py-10 text-cream">
         <p className="font-serif text-3xl">Esse caderno sumiu.</p>
         {onClose ? <button type="button" className="paper-btn mt-4" onClick={onClose}>Voltar</button> : null}
       </div>
@@ -69,7 +69,7 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
   const { profile, posts } = bundle;
 
   return (
-    <div className="h-full overflow-y-auto px-4 pb-8 text-paper">
+    <div className="h-full overflow-y-auto px-4 pb-8 text-cream">
       {onClose ? (
         <button type="button" className="mt-2 grid size-11 place-items-center" aria-label="Voltar" onClick={onClose}>
           <ChevronLeft />
@@ -125,7 +125,7 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
             {!profile.isCasa ? (
               <button
                 type="button"
-                className="ghost-btn text-paper"
+                className="ghost-btn text-cream"
                 onClick={() => void toggleBlock({ data: { userId: profile.userId } }).then(() => desk.refresh())}
               >
                 Bloquear
@@ -139,11 +139,11 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
         <Editor profile={profile} onSaved={() => { setEditing(false); load(); desk.refresh(); }} />
       ) : null}
       <div className="mt-5 flex gap-4 border-b border-paper/20">
-        <button type="button" className={shelf === "pages" ? "shelf-tab on text-paper" : "shelf-tab text-paper/70"} onClick={() => setShelf("pages")}>Páginas</button>
+        <button type="button" className={shelf === "pages" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"} onClick={() => setShelf("pages")}>Páginas</button>
         {profile.isMe ? (
           <>
-            <button type="button" className={shelf === "saved" ? "shelf-tab on text-paper" : "shelf-tab text-paper/70"} onClick={() => setShelf("saved")}>Fita</button>
-            <button type="button" className={shelf === "liked" ? "shelf-tab on text-paper" : "shelf-tab text-paper/70"} onClick={() => setShelf("liked")}>Curtidas</button>
+            <button type="button" className={shelf === "saved" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"} onClick={() => setShelf("saved")}>Fita</button>
+            <button type="button" className={shelf === "liked" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"} onClick={() => setShelf("liked")}>Curtidas</button>
           </>
         ) : null}
       </div>
@@ -154,20 +154,20 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
           </button>
         ))}
         {(shelf === "pages" ? posts : kept).length === 0 ? (
-          <p className="font-serif text-xl text-paper/80">
+          <p className="font-serif text-xl text-cream/80">
             {shelf === "saved" ? "A fita ainda está vazia." : shelf === "liked" ? "Nenhuma curtida ainda." : "Nenhuma página ainda."}
           </p>
         ) : null}
       </div>
       {profile.isMe ? (
         <section className="mt-8">
-          <h3 className="font-serif text-2xl text-paper">Gente por perto</h3>
+          <h3 className="font-serif text-2xl text-cream">Gente por perto</h3>
           <ul className="mt-3 space-y-2">
             {people.map((person) => (
               <li key={person.userId} className="flex items-center justify-between gap-2">
                 <button type="button" className="min-h-11 text-left" onClick={() => desk.openUser(person.userId)}>
                   <span className="block font-semibold">{person.displayName}</span>
-                  <span className="text-xs text-paper/70">@{person.handle}</span>
+                  <span className="text-xs text-cream/70">@{person.handle}</span>
                 </button>
                 <button
                   type="button"
@@ -186,7 +186,7 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
                 {blocked.map((person) => (
                   <li key={person.userId} className="flex items-center justify-between">
                     <span>@{person.handle}</span>
-                    <button type="button" className="ghost-btn text-paper" onClick={() => void toggleBlock({ data: { userId: person.userId } }).then(() => listBlocks().then(setBlocked))}>
+                    <button type="button" className="ghost-btn text-cream" onClick={() => void toggleBlock({ data: { userId: person.userId } }).then(() => listBlocks().then(setBlocked))}>
                       Desbloquear
                     </button>
                   </li>
@@ -338,12 +338,12 @@ export function ChatList() {
   useEffect(() => {
     listConversations().then(setRows).catch(() => setRows([]));
   }, [desk.tick]);
-  if (!rows) return <p className="px-5 py-10 font-serif text-paper">Abrindo as cartas…</p>;
+  if (!rows) return <p className="px-5 py-10 font-serif text-cream">Abrindo as cartas…</p>;
   return (
-    <div className="h-full overflow-y-auto px-4 py-4 text-paper">
+    <div className="h-full overflow-y-auto px-4 py-4 text-cream">
       <h2 className="font-serif text-4xl">Cartas</h2>
       {rows.length === 0 ? (
-        <p className="mt-3 text-paper/80">Nenhuma conversa ainda. Abre um perfil e toca em Escrever.</p>
+        <p className="mt-3 text-cream/80">Nenhuma conversa ainda. Abre um perfil e toca em Escrever.</p>
       ) : (
         <ul className="mt-4 space-y-2">
           {rows.map((row) => (
@@ -352,7 +352,7 @@ export function ChatList() {
                 <Portrait name={row.penName || row.displayName} />
                 <span className="min-w-0">
                   <span className="block font-semibold">{row.penName || row.displayName}</span>
-                  <span className="block truncate text-sm text-paper/70">{row.lastBody || "Conversa aberta"}</span>
+                  <span className="block truncate text-sm text-cream/70">{row.lastBody || "Conversa aberta"}</span>
                 </span>
               </button>
             </li>
@@ -393,7 +393,7 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
         {messages.map((message) => (
           <p key={message.id} className={message.mine ? "bubble-me" : "bubble-them"}>{message.body}</p>
         ))}
-        {messages.length === 0 ? <p className="text-sm text-paper/70">Começa a carta.</p> : null}
+        {messages.length === 0 ? <p className="text-sm text-cream/70">Começa a carta.</p> : null}
       </div>
       <form
         className="flex gap-2 p-3"
@@ -416,7 +416,7 @@ export function ChatThread({ conversationId, title, onClose }: { conversationId:
           <Send className="size-5" />
         </button>
       </form>
-      {error ? <p className="px-4 pb-3 text-sm text-paper">{error}</p> : null}
+      {error ? <p className="px-4 pb-3 text-sm text-cream">{error}</p> : null}
     </div>
   );
 }

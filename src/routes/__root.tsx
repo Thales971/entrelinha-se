@@ -27,6 +27,12 @@ export const Route = createRootRoute({
     <html lang="pt-BR" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var s=localStorage.getItem('entrelinha-lamp');if(s!=='day'&&s!=='night'){s=matchMedia('(prefers-color-scheme: dark)').matches?'night':'day'}document.documentElement.dataset.lamp=s}catch(e){}})();",
+          }}
+        />
       </head>
       <body>
         <PreviewHostBridge />

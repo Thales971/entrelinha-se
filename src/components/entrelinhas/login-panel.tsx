@@ -33,12 +33,12 @@ async function authFetch(path: string, body: Record<string, string>) {
 
 export function Boot() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center text-paper">
+    <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center text-cream">
       <div className="boot-book">
         <p className="font-serif text-xl leading-none tracking-tight">entrelinha-se</p>
         <p className="mt-2 text-xs tracking-[0.14em] uppercase text-ink-soft">caderno aberto</p>
       </div>
-      <p className="font-serif text-lg text-paper">Abrindo o caderno…</p>
+      <p className="font-serif text-lg text-cream">Abrindo o caderno…</p>
     </div>
   );
 }
@@ -86,10 +86,10 @@ export function LoginPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-5 py-8 text-paper">
-      <p className="text-xs tracking-[0.18em] uppercase text-paper/70">um livro no bolso</p>
+    <div className="flex h-full flex-col overflow-y-auto px-5 py-8 text-cream">
+      <p className="text-xs tracking-[0.18em] uppercase text-cream/70">um livro no bolso</p>
       <h1 className="mt-2 font-serif text-[2.65rem] leading-none tracking-tight">entrelinha-se</h1>
-      <p className="mt-3 max-w-sm font-serif text-lg leading-snug text-paper/85">
+      <p className="mt-3 max-w-sm font-serif text-lg leading-snug text-cream/85">
         Feed pra ler sentado. Folhear pra frase curta. A página continua sendo um livro.
       </p>
 
@@ -109,7 +109,7 @@ export function LoginPanel() {
         <input className="field" placeholder="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         <input className="field" placeholder="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "up" ? "new-password" : "current-password"} />
         {mode === "up" ? (
-          <label className="flex items-start gap-3 text-sm text-paper/90">
+          <label className="flex items-start gap-3 text-sm text-cream/90">
             <input type="checkbox" className="mt-1 size-4" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
             <span>
               Li e aceito as regras do caderno.{" "}
@@ -126,13 +126,13 @@ export function LoginPanel() {
             ))}
           </ul>
         ) : null}
-        {error ? <p className="text-sm text-paper">{error}</p> : null}
+        {error ? <p className="text-sm text-cream">{error}</p> : null}
         <button className="seal-btn w-full" type="submit" disabled={busy}>
           {busy ? "Abrindo…" : mode === "up" ? "Criar meu caderno" : "Entrar"}
         </button>
       </form>
 
-      <p className="my-4 text-center text-xs tracking-[0.14em] uppercase text-paper/60">ou</p>
+      <p className="my-4 text-center text-xs tracking-[0.14em] uppercase text-cream/60">ou</p>
       <div className="space-y-2">
         {GROK_PROVIDERS.map((provider) => (
           <button

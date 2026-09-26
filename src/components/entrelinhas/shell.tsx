@@ -68,7 +68,7 @@ export function Shell({ user }: { user: AppUser }) {
     <DeskProvider value={api}>
       <div className="relative flex h-full min-h-0 flex-col">
         {tab === "inicio" && !overlay ? (
-          <header className="topbar px-4 pb-3 pt-4">
+          <header className="topbar px-4 pb-3 pt-4 pr-16">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs tracking-[0.16em] uppercase text-ink-soft">estante</p>
               <div className="flex gap-2">

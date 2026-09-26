@@ -34,10 +34,10 @@ export function Folhear() {
     if (navigator.vibrate) navigator.vibrate(12);
   }
 
-  if (!posts) return <p className="px-6 py-16 font-serif text-2xl text-paper">Folheando…</p>;
+  if (!posts) return <p className="px-6 py-16 font-serif text-2xl text-cream">Folheando…</p>;
   if (!posts.length) {
     return (
-      <div className="flex h-full flex-col justify-end px-6 pb-10 text-paper">
+      <div className="flex h-full flex-col justify-end px-6 pb-10 text-cream">
         <p className="font-serif text-4xl leading-none">Nada curto pra folhear.</p>
         <button type="button" className="seal-btn mt-5" onClick={() => desk.openCompose("post", "frase")}>
           Escrever uma frase
