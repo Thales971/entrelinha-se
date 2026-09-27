@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, Lock, Mail, Send } from "lucide-react";
+import { BookPage, InkPicker, MoldPicker, Portrait } from "@/components/entrelinhas/book-page";
+import { useDesk } from "@/components/entrelinhas/desk";
+import { UserButton } from "@/lib/auth/gates";
 import {
   getProfile,
   listBlocks,
@@ -14,6 +15,8 @@ import {
   toggleBlock,
   toggleFollow,
 } from "@/lib/entrelinhas/api";
+import { rejectText } from "@/lib/entrelinhas/guard";
+import { LangSwitch, useLang } from "@/lib/entrelinhas/i18n";
 import {
   slugHandle,
   type ChatMessage,
@@ -23,24 +26,26 @@ import {
   type PostCard,
   type Profile,
 } from "@/lib/entrelinhas/model";
-import { BookPage, InkPicker, MoldPicker, Portrait } from "@/components/entrelinhas/book-page";
-import { LangSwitch, useLang } from "@/lib/entrelinhas/i18n";
-import { translateLines } from "@/lib/entrelinhas/translate";
-import { useDesk } from "@/components/entrelinhas/desk";
-import { rejectText } from "@/lib/entrelinhas/guard";
 import { openLetter, sealLetter } from "@/lib/entrelinhas/seal";
-import { UserButton } from "@/lib/auth/gates";
+import { translateLines } from "@/lib/entrelinhas/translate";
+import { ChevronLeft, Lock, Mail, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export function ProfileView({ userId, onClose }: { userId: string; onClose?: () => void }) {
   const desk = useDesk();
   const { t } = useLang();
-  const [bundle, setBundle] = useState<{ profile: Profile; posts: PostCard[] } | null | undefined>(undefined);
+  const [bundle, setBundle] = useState<{ profile: Profile; posts: PostCard[] } | null | undefined>(
+    undefined,
+  );
   const [editing, setEditing] = useState(false);
   const [shelf, setShelf] = useState<"pages" | "saved" | "liked">("pages");
   const [kept, setKept] = useState<PostCard[]>([]);
   const [people, setPeople] = useState<Awaited<ReturnType<typeof listPeople>>>([]);
-  const [blocked, setBlocked] = useState<{ userId: string; handle: string; displayName: string }[]>([]);
+  const [blocked, setBlocked] = useState<{ userId: string; handle: string; displayName: string }[]>(
+    [],
+  );
   const [error, setError] = useState("");
+  const [openingChat, setOpeningChat] = useState(false);
 
   function load() {
     getProfile({ data: { userId } })
@@ -51,22 +56,33 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
   useEffect(() => {
     load();
     if (userId === desk.meId) {
-      listPeople().then(setPeople).catch(() => undefined);
-      listBlocks().then(setBlocked).catch(() => undefined);
+      listPeople()
+        .then(setPeople)
+        .catch(() => undefined);
+      listBlocks()
+        .then(setBlocked)
+        .catch(() => undefined);
     }
   }, [userId, desk.tick]);
 
   useEffect(() => {
     if (userId !== desk.meId || shelf === "pages") return;
-    listShelf({ data: { shelf } }).then(setKept).catch(() => setKept([]));
+    listShelf({ data: { shelf } })
+      .then(setKept)
+      .catch(() => setKept([]));
   }, [shelf, userId, desk.meId, desk.tick]);
 
-  if (bundle === undefined) return <p className="px-5 py-10 font-serif text-2xl text-cream">{t("openingBook")}</p>;
+  if (bundle === undefined)
+    return <p className="px-5 py-10 font-serif text-2xl text-cream">{t("openingBook")}</p>;
   if (!bundle) {
     return (
       <div className="px-5 py-10 text-cream">
         <p className="font-serif text-3xl">{t("bookGone")}</p>
-        {onClose ? <button type="button" className="paper-btn mt-4" onClick={onClose}>{t("back")}</button> : null}
+        {onClose ? (
+          <button type="button" className="paper-btn mt-4" onClick={onClose}>
+            {t("back")}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -75,37 +91,65 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
   return (
     <div className="h-full overflow-y-auto px-4 pb-8 text-cream">
       {onClose ? (
-        <button type="button" className="mt-2 grid size-11 place-items-center" aria-label="Voltar" onClick={onClose}>
+        <button
+          type="button"
+          className="mt-2 grid size-11 place-items-center"
+          aria-label="Voltar"
+          onClick={onClose}
+        >
           <ChevronLeft />
         </button>
       ) : null}
       <div className="profile-plate">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="font-serif text-4xl leading-none">{profile.penName || profile.displayName}</p>
+            <p className="font-serif text-4xl leading-none">
+              {profile.penName || profile.displayName}
+            </p>
             <p className="mt-2 text-sm text-ink-soft">@{profile.handle}</p>
           </div>
-          <Portrait name={profile.penName || profile.displayName} src={profile.avatarData} className="size-16 text-2xl" />
+          <Portrait
+            name={profile.penName || profile.displayName}
+            src={profile.avatarData}
+            className="size-16 text-2xl"
+          />
         </div>
-        <p className="mt-3 font-serif text-lg">{profile.bio || (profile.isMe ? t("blankBio") : "")}</p>
+        <p className="mt-3 font-serif text-lg">
+          {profile.bio || (profile.isMe ? t("blankBio") : "")}
+        </p>
         {profile.noteFresh && profile.noteText ? (
-          <p className="mt-3 inline-block rounded-2xl bg-paper-deep px-3 py-2 font-serif text-sm">{t("note")}: {profile.noteText}</p>
+          <p className="mt-3 inline-block rounded-2xl bg-paper-deep px-3 py-2 font-serif text-sm">
+            {t("note")}: {profile.noteText}
+          </p>
         ) : null}
         <div className="mt-4 flex gap-4 text-sm">
-          <span><b className="tabular-nums">{profile.pages}</b> {t("pagesWord")}</span>
-          <span><b className="tabular-nums">{profile.followers}</b> {t("readers")}</span>
-          <span><b className="tabular-nums">{profile.following}</b> {t("followingCount")}</span>
+          <span>
+            <b className="tabular-nums">{profile.pages}</b> {t("pagesWord")}
+          </span>
+          <span>
+            <b className="tabular-nums">{profile.followers}</b> {t("readers")}
+          </span>
+          <span>
+            <b className="tabular-nums">{profile.following}</b> {t("followingCount")}
+          </span>
         </div>
       </div>
       <div className="mt-4 flex gap-2">
         {profile.isMe ? (
-          <button type="button" className="paper-btn" onClick={() => setEditing((v) => !v)}>{t("editBook")}</button>
+          <button type="button" className="paper-btn" onClick={() => setEditing((v) => !v)}>
+            {t("editBook")}
+          </button>
         ) : (
           <>
             <button
               type="button"
               className="seal-btn"
-              onClick={() => void toggleFollow({ data: { userId: profile.userId } }).then(() => { load(); desk.refresh(); })}
+              onClick={() =>
+                void toggleFollow({ data: { userId: profile.userId } }).then(() => {
+                  load();
+                  desk.refresh();
+                })
+              }
             >
               {profile.followedByMe ? t("following") : t("follow")}
             </button>
@@ -113,25 +157,37 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
               <button
                 type="button"
                 className="seal-btn inline-flex flex-1 items-center justify-center gap-2"
+                disabled={openingChat}
                 onClick={() => {
-                  void openConversation({ data: { userId: profile.userId } }).then((res) => {
-                    if (!res.ok) {
-                      setError(res.error);
-                      return;
-                    }
-                    desk.openChat(res.id, profile.penName || profile.displayName);
-                  });
+                  setOpeningChat(true);
+                  setError("");
+                  void openConversation({ data: { userId: profile.userId } })
+                    .then((res) => {
+                      if (!res.ok) {
+                        setError(res.error);
+                        setOpeningChat(false);
+                        return;
+                      }
+                      desk.openChat(res.id, profile.penName || profile.displayName);
+                      setOpeningChat(false);
+                    })
+                    .catch(() => {
+                      setError("Não deu pra abrir a carta. Tenta de novo.");
+                      setOpeningChat(false);
+                    });
                 }}
               >
                 <Mail className="size-4" />
-                {t("sendLetter")}
+                {openingChat ? "Abrindo…" : t("sendLetter")}
               </button>
             ) : null}
             {!profile.isCasa ? (
               <button
                 type="button"
                 className="ghost-btn text-cream"
-                onClick={() => void toggleBlock({ data: { userId: profile.userId } }).then(() => desk.refresh())}
+                onClick={() =>
+                  void toggleBlock({ data: { userId: profile.userId } }).then(() => desk.refresh())
+                }
               >
                 {t("block")}
               </button>
@@ -141,26 +197,60 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
       </div>
       {error ? <p className="mt-2 text-sm">{error}</p> : null}
       {editing && profile.isMe ? (
-        <Editor profile={profile} onSaved={() => { setEditing(false); load(); desk.refresh(); }} />
+        <Editor
+          profile={profile}
+          onSaved={() => {
+            setEditing(false);
+            load();
+            desk.refresh();
+          }}
+        />
       ) : null}
       <div className="mt-5 flex gap-4 border-b border-paper/20">
-        <button type="button" className={shelf === "pages" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"} onClick={() => setShelf("pages")}>{t("pages")}</button>
+        <button
+          type="button"
+          className={shelf === "pages" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"}
+          onClick={() => setShelf("pages")}
+        >
+          {t("pages")}
+        </button>
         {profile.isMe ? (
           <>
-            <button type="button" className={shelf === "saved" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"} onClick={() => setShelf("saved")}>{t("ribbon")}</button>
-            <button type="button" className={shelf === "liked" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"} onClick={() => setShelf("liked")}>{t("likes")}</button>
+            <button
+              type="button"
+              className={shelf === "saved" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"}
+              onClick={() => setShelf("saved")}
+            >
+              {t("ribbon")}
+            </button>
+            <button
+              type="button"
+              className={shelf === "liked" ? "shelf-tab on text-cream" : "shelf-tab text-cream/70"}
+              onClick={() => setShelf("liked")}
+            >
+              {t("likes")}
+            </button>
           </>
         ) : null}
       </div>
       <div className="mt-4 space-y-5">
         {(shelf === "pages" ? posts : kept).map((post) => (
-          <button key={post.id} type="button" className="block w-full text-left" onClick={() => desk.openPost(post.id)}>
+          <button
+            key={post.id}
+            type="button"
+            className="block w-full text-left"
+            onClick={() => desk.openPost(post.id)}
+          >
             <BookPage post={post} />
           </button>
         ))}
         {(shelf === "pages" ? posts : kept).length === 0 ? (
           <p className="font-serif text-xl text-cream/80">
-            {shelf === "saved" ? t("emptyRibbon") : shelf === "liked" ? t("emptyLikes") : t("noPages")}
+            {shelf === "saved"
+              ? t("emptyRibbon")
+              : shelf === "liked"
+                ? t("emptyLikes")
+                : t("noPages")}
           </p>
         ) : null}
       </div>
@@ -173,14 +263,23 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
           <ul className="mt-3 space-y-2">
             {people.map((person) => (
               <li key={person.userId} className="flex items-center justify-between gap-2">
-                <button type="button" className="min-h-11 text-left" onClick={() => desk.openUser(person.userId)}>
+                <button
+                  type="button"
+                  className="min-h-11 text-left"
+                  onClick={() => desk.openUser(person.userId)}
+                >
                   <span className="block font-semibold">{person.displayName}</span>
                   <span className="text-xs text-cream/70">@{person.handle}</span>
                 </button>
                 <button
                   type="button"
                   className="paper-btn"
-                  onClick={() => void toggleFollow({ data: { userId: person.userId } }).then(() => { desk.refresh(); listPeople().then(setPeople); })}
+                  onClick={() =>
+                    void toggleFollow({ data: { userId: person.userId } }).then(() => {
+                      desk.refresh();
+                      listPeople().then(setPeople);
+                    })
+                  }
                 >
                   {person.followedByMe ? t("following") : t("follow")}
                 </button>
@@ -194,7 +293,15 @@ export function ProfileView({ userId, onClose }: { userId: string; onClose?: () 
                 {blocked.map((person) => (
                   <li key={person.userId} className="flex items-center justify-between">
                     <span>@{person.handle}</span>
-                    <button type="button" className="ghost-btn text-cream" onClick={() => void toggleBlock({ data: { userId: person.userId } }).then(() => listBlocks().then(setBlocked))}>
+                    <button
+                      type="button"
+                      className="ghost-btn text-cream"
+                      onClick={() =>
+                        void toggleBlock({ data: { userId: person.userId } }).then(() =>
+                          listBlocks().then(setBlocked),
+                        )
+                      }
+                    >
                       {t("unblock")}
                     </button>
                   </li>
@@ -287,7 +394,9 @@ function PortraitField({ current }: { current: string }) {
             Tirar
           </button>
         ) : null}
-        <p className="mt-1 text-xs text-ink-soft">Só entra foto de verdade, pequena. Sem link e sem arquivo estranho.</p>
+        <p className="mt-1 text-xs text-ink-soft">
+          Só entra foto de verdade, pequena. Sem link e sem arquivo estranho.
+        </p>
         {error ? <p className="text-sm text-seal">{error}</p> : null}
       </div>
     </div>
@@ -323,19 +432,48 @@ function Editor({ profile, onSaved }: { profile: Profile; onSaved: () => void })
         });
       }}
     >
-      <input className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nome" />
-      <input className="field" value={penName} onChange={(e) => setPenName(e.target.value)} placeholder="Nome de pena" />
-      <input className="field" value={handle} onChange={(e) => setHandle(slugHandle(e.target.value))} placeholder="usuario" />
+      <input
+        className="field"
+        value={displayName}
+        onChange={(e) => setDisplayName(e.target.value)}
+        placeholder="Nome"
+      />
+      <input
+        className="field"
+        value={penName}
+        onChange={(e) => setPenName(e.target.value)}
+        placeholder="Nome de pena"
+      />
+      <input
+        className="field"
+        value={handle}
+        onChange={(e) => setHandle(slugHandle(e.target.value))}
+        placeholder="usuario"
+      />
       <label className="block text-sm">
         Descrição do caderno
-        <textarea className="field mt-1" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Uma linha sobre você" maxLength={180} />
+        <textarea
+          className="field mt-1"
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder="Uma linha sobre você"
+          maxLength={180}
+        />
       </label>
       <PortraitField current={profile.avatarData} />
-      <input className="field" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Nota no topo, fica uma semana" maxLength={80} />
+      <input
+        className="field"
+        value={noteText}
+        onChange={(e) => setNoteText(e.target.value)}
+        placeholder="Nota no topo, fica uma semana"
+        maxLength={80}
+      />
       <MoldPicker value={moldId} onChange={setMoldId} />
       <InkPicker value={inkId} onChange={setInkId} />
       {error ? <p className="text-sm text-seal">{error}</p> : null}
-      <button className="seal-btn w-full" disabled={busy} type="submit">{busy ? "Salvando…" : "Salvar"}</button>
+      <button className="seal-btn w-full" disabled={busy} type="submit">
+        {busy ? "Salvando…" : "Salvar"}
+      </button>
     </form>
   );
 }
@@ -383,8 +521,12 @@ export function ChatList({ sealLost }: { sealLost: boolean }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    listConversations().then(setRows).catch(() => setRows([]));
-    listPeople().then(setPeople).catch(() => setPeople([]));
+    listConversations()
+      .then(setRows)
+      .catch(() => setRows([]));
+    listPeople()
+      .then(setPeople)
+      .catch(() => setPeople([]));
   }, [desk.tick]);
 
   function writeTo(userId: string, name: string) {
@@ -406,7 +548,11 @@ export function ChatList({ sealLost }: { sealLost: boolean }) {
       <ul className="mt-4 space-y-2">
         {rows.map((row) => (
           <li key={row.id}>
-            <button type="button" className="letter-row" onClick={() => desk.openChat(row.id, row.penName || row.displayName)}>
+            <button
+              type="button"
+              className="letter-row"
+              onClick={() => desk.openChat(row.id, row.penName || row.displayName)}
+            >
               <Portrait name={row.penName || row.displayName} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
@@ -423,18 +569,27 @@ export function ChatList({ sealLost }: { sealLost: boolean }) {
       <h3 className="mt-8 font-serif text-2xl">{t("pickSomeone")}</h3>
       {people.length === 0 ? <p className="mt-2 text-sm text-cream/70">{t("noPeople")}</p> : null}
       <ul className="mt-3 space-y-2">
-        {people.filter((person) => person.userId !== "casa").slice(0, 8).map((person) => (
-          <li key={person.userId}>
-            <button type="button" className="letter-row" onClick={() => writeTo(person.userId, person.penName || person.displayName)}>
-              <Portrait name={person.penName || person.displayName} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{person.penName || person.displayName}</span>
-                <span className="block text-xs text-cream/70">@{person.handle}</span>
-              </span>
-              <span className="letter-open seal">{t("sendLetter")}</span>
-            </button>
-          </li>
-        ))}
+        {people
+          .filter((person) => person.userId !== "casa")
+          .slice(0, 8)
+          .map((person) => (
+            <li key={person.userId}>
+              <button
+                type="button"
+                className="letter-row"
+                onClick={() => writeTo(person.userId, person.penName || person.displayName)}
+              >
+                <Portrait name={person.penName || person.displayName} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">
+                    {person.penName || person.displayName}
+                  </span>
+                  <span className="block text-xs text-cream/70">@{person.handle}</span>
+                </span>
+                <span className="letter-open seal">{t("sendLetter")}</span>
+              </button>
+            </li>
+          ))}
       </ul>
       {error ? <p className="mt-3 text-sm">{error}</p> : null}
     </div>
@@ -463,20 +618,24 @@ export function ChatThread({
   const end = useRef<HTMLDivElement>(null);
 
   function load() {
-    listMessages({ data: { conversationId } }).then(async (res) => {
-      setMessages(res.messages);
-      setOtherKey(res.otherKey || "");
-      if (res.error) setError(res.error);
-      const next: Record<string, string> = {};
-      for (const message of res.messages) {
-        if (!message.cipher) {
-          next[message.id] = message.body;
-          continue;
+    listMessages({ data: { conversationId } })
+      .then(async (res) => {
+        setMessages(res.messages);
+        setOtherKey(res.otherKey || "");
+        if (res.error) setError(res.error);
+        const next: Record<string, string> = {};
+        for (const message of res.messages) {
+          if (!message.cipher) {
+            next[message.id] = message.body;
+            continue;
+          }
+          next[message.id] =
+            (await openLetter(message.cipher, res.otherKey || "", message.mine)) ||
+            t("sealedLetter");
         }
-        next[message.id] = (await openLetter(message.cipher, res.otherKey || "", message.mine)) || t("sealedLetter");
-      }
-      setPlain(next);
-    }).catch(() => setError("Não deu pra abrir a carta."));
+        setPlain(next);
+      })
+      .catch(() => setError("Não deu pra abrir a carta."));
   }
 
   useEffect(() => {
@@ -494,13 +653,20 @@ export function ChatThread({
   return (
     <div className="sheet chat-sheet">
       <header className="chat-head">
-        <button type="button" className="grid size-11 place-items-center" aria-label={t("back")} onClick={onClose}>
+        <button
+          type="button"
+          className="grid size-11 place-items-center"
+          aria-label={t("back")}
+          onClick={onClose}
+        >
           <ChevronLeft />
         </button>
         <Portrait name={title} />
         <div className="min-w-0">
           <h2 className="truncate font-serif text-xl leading-none">{title}</h2>
-          <p className="mt-1 flex items-center gap-1 text-xs text-cream/70"><Lock className="size-3" /> {t("sealedNote")}</p>
+          <p className="mt-1 flex items-center gap-1 text-xs text-cream/70">
+            <Lock className="size-3" /> {t("sealedNote")}
+          </p>
         </div>
       </header>
       <div className="chat-wall min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
@@ -591,7 +757,12 @@ export function ChatThread({
             });
         }}
       >
-        <input className="field chat-input" placeholder={t("writeHere")} value={text} onChange={(event) => setText(event.target.value)} />
+        <input
+          className="field chat-input"
+          placeholder={t("writeHere")}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
         <button className="seal-fab shrink-0" type="submit" aria-label={t("sendLetter")}>
           <Send className="size-5" />
         </button>

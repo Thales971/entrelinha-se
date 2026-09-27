@@ -1,4 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { acceptAvatar, acceptImage, markPace, pace, rejectText } from "@/lib/entrelinhas/guard";
@@ -21,12 +20,20 @@ import {
   type StoryItem,
   type TrayPerson,
 } from "@/lib/entrelinhas/model";
+import { createServerFn } from "@tanstack/react-start";
 
 const KIND_SET = new Set<string>(POST_KINDS);
 const MOLD_SET = new Set<string>(MOLD_IDS);
 const INK_SET = new Set<string>(INK_IDS);
 const REASON_SET = new Set<string>(REPORT_REASONS.map((r) => r.id));
-const RESERVED = new Set(["casa", "admin", "entrelinhas", "entrelinha-se", "entrelinhase", "suporte"]);
+const RESERVED = new Set([
+  "casa",
+  "admin",
+  "entrelinhas",
+  "entrelinha-se",
+  "entrelinhase",
+  "suporte",
+]);
 
 function asRecord(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
@@ -35,8 +42,14 @@ function asRecord(input: unknown): Record<string, unknown> {
 
 function clip(value: unknown, max: number): string {
   if (typeof value !== "string") return "";
-  return value
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+  return Array.from(value, (char) => {
+    const code = char.codePointAt(0) ?? 0;
+    const control =
+      code <= 0x08 || code === 0x0b || code === 0x0c || (code >= 0x0e && code <= 0x1f);
+    const directional = (code >= 0x202a && code <= 0x202e) || (code >= 0x2066 && code <= 0x2069);
+    return control || code === 0x7f || directional || code === 0xfeff ? "" : char;
+  })
+    .join("")
     .trim()
     .slice(0, max);
 }
@@ -133,7 +146,10 @@ function mapPost(r: PostRow): PostCard {
     reposterHandle: r.reposter_handle ?? "",
     avatarData: acceptAvatar(r.avatar_data ?? ""),
   };
-  if (card.userId !== "casa" && rejectText(card.title, card.body, card.citedAuthor, card.songTitle, card.artist)) {
+  if (
+    card.userId !== "casa" &&
+    rejectText(card.title, card.body, card.citedAuthor, card.songTitle, card.artist)
+  ) {
     card.title = "";
     card.body = "Esta página foi retida.";
     card.citedAuthor = "";
@@ -557,7 +573,10 @@ export const createPost = createServerFn({ method: "POST" })
     const meta = KIND_META[data.kind];
     const body = data.body.slice(0, meta.max);
     if (!body) return err("A página está em branco.");
-    const lines = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = body
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length > meta.lines) {
       return err(
         data.kind === "musica"
@@ -707,7 +726,8 @@ export const setAvatar = createServerFn({ method: "POST" })
     const slow = await pace(sql, me, "avatar");
     if (slow) return err(slow);
     const image = data.dataUrl ? acceptAvatar(data.dataUrl) : "";
-    if (data.dataUrl && !image) return err("Essa foto não entra. Manda uma imagem pequena, de verdade.");
+    if (data.dataUrl && !image)
+      return err("Essa foto não entra. Manda uma imagem pequena, de verdade.");
     const prof = await sql<{ user_id: string }>`select user_id from profiles where user_id = ${me}`;
     if (!prof.length) return err("Termina o cadastro antes do retrato.");
     await sql`update profiles set avatar_data = ${image} where user_id = ${me}`;
@@ -718,7 +738,7 @@ export const setAvatar = createServerFn({ method: "POST" })
 export const listShelf = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const shelf = asRecord(input).shelf;
-    return { shelf: shelf === "liked" ? "liked" as const : "saved" as const };
+    return { shelf: shelf === "liked" ? ("liked" as const) : ("saved" as const) };
   })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
@@ -892,7 +912,9 @@ export const addComment = createServerFn({ method: "POST" })
     if (slow) return err(slow);
     const prof = await sql`select user_id from profiles where user_id = ${me}`;
     if (!prof.length) return err("Termina o cadastro antes.");
-    const post = await sql<{ user_id: string }>`select user_id from posts where id = ${data.postId}`;
+    const post = await sql<{
+      user_id: string;
+    }>`select user_id from posts where id = ${data.postId}`;
     if (!post[0]) return err("Essa página sumiu.");
     if (await isBlocked(me, post[0].user_id)) return err("Não dá pra comentar.");
     const id = crypto.randomUUID();
@@ -941,7 +963,8 @@ export const listStoryTray = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     const me = context.userId;
-    const liveCasa = await sql`select id from stories where user_id = 'casa' and expires_at > now() limit 1`;
+    const liveCasa =
+      await sql`select id from stories where user_id = 'casa' and expires_at > now() limit 1`;
     if (!liveCasa.length) {
       await sql`delete from story_views where story_id in ('casa-story-mesa', 'casa-story-frase')`;
       const house = [
@@ -1107,12 +1130,25 @@ export const publishKey = createServerFn({ method: "POST" })
   .validator((input: unknown) => ({ publicKey: clip(asRecord(input).publicKey, 800) }))
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
-    if (!/^[A-Za-z0-9+/=]+$/.test(data.publicKey) || data.publicKey.length < 80) return err("Chave inválida.");
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data.publicKey) || data.publicKey.length < 80)
+      return err("Chave inválida.");
+    let keyIsValid = false;
+    try {
+      const raw = Buffer.from(data.publicKey, "base64");
+      await crypto.subtle.importKey("spki", raw, { name: "ECDH", namedCurve: "P-256" }, true, []);
+      keyIsValid = true;
+    } catch {
+      keyIsValid = false;
+    }
+    if (!keyIsValid) return err("Chave inválida.");
     const sql = await getSql();
-    const rows = await sql<{ public_key: string }>`select public_key from profiles where user_id = ${context.userId}`;
+    const rows = await sql<{
+      public_key: string;
+    }>`select public_key from profiles where user_id = ${context.userId}`;
     if (!rows.length) return err("Termina o cadastro antes.");
     const current = rows[0].public_key ?? "";
-    if (current && current !== data.publicKey) return { ok: true as const, publicKey: current, mismatch: true as const };
+    if (current && current !== data.publicKey)
+      return { ok: true as const, publicKey: current, mismatch: true as const };
     if (!current) {
       await sql`update profiles set public_key = ${data.publicKey} where user_id = ${context.userId}`;
     }
@@ -1200,7 +1236,8 @@ export const openConversation = createServerFn({ method: "POST" })
     const me = context.userId;
     if (!data.userId || data.userId === me) return err("Escolhe outra pessoa.");
     if (data.userId === "casa") return err("A casa não responde no chat. Ela fica no feed.");
-    if (await isBlocked(me, data.userId)) return err("Não dá pra escrever pra quem está bloqueado.");
+    if (await isBlocked(me, data.userId))
+      return err("Não dá pra escrever pra quem está bloqueado.");
     const sql = await getSql();
     const who = await sql`select user_id from profiles where user_id = ${data.userId}`;
     if (!who.length) return err("Esse caderno não existe.");
@@ -1250,7 +1287,9 @@ export const listMessages = createServerFn({ method: "POST" })
       return { messages: [] as ChatMessage[], otherKey: "", error: "Conversa bloqueada." };
     }
     const sql = await getSql();
-    const keyRows = await sql<{ public_key: string }>`select public_key from profiles where user_id = ${other}`;
+    const keyRows = await sql<{
+      public_key: string;
+    }>`select public_key from profiles where user_id = ${other}`;
     const rows = await sql<{
       id: string;
       sender_id: string;
@@ -1289,14 +1328,39 @@ export const sendMessage = createServerFn({ method: "POST" })
   })
   .middleware([authMiddleware])
   .handler(async ({ context, data }) => {
-    if (!data.cipher.startsWith("{") || !data.cipher.endsWith("}")) return err("A carta precisa ir lacrada.");
-    let packed: { v?: number; forThem?: string; forMe?: string; iv?: string };
+    if (!data.cipher.startsWith("{") || !data.cipher.endsWith("}"))
+      return err("A carta precisa ir lacrada.");
+    let packed: { v?: number; iv?: string; meIv?: string; forThem?: string; forMe?: string };
     try {
-      packed = JSON.parse(data.cipher) as { v?: number; forThem?: string; forMe?: string; iv?: string };
+      packed = JSON.parse(data.cipher) as {
+        v?: number;
+        iv?: string;
+        meIv?: string;
+        forThem?: string;
+        forMe?: string;
+      };
     } catch {
       return err("A carta precisa ir lacrada.");
     }
-    if (packed.v !== 1 || !packed.forThem || !packed.forMe || !packed.iv) return err("A carta precisa ir lacrada.");
+    const iv = typeof packed.iv === "string" ? packed.iv : "";
+    const meIv = typeof packed.meIv === "string" ? packed.meIv : "";
+    const forThem = typeof packed.forThem === "string" ? packed.forThem : "";
+    const forMe = typeof packed.forMe === "string" ? packed.forMe : "";
+    const base64 = (value: unknown) =>
+      typeof value === "string" && /^[A-Za-z0-9+/]+={0,2}$/.test(value);
+    const byteLength = (value: string) => Math.floor((value.replace(/=+$/, "").length * 3) / 4);
+    if (
+      packed.v !== 1 ||
+      !base64(iv) ||
+      !base64(meIv) ||
+      !base64(forThem) ||
+      !base64(forMe) ||
+      byteLength(iv) !== 12 ||
+      byteLength(meIv) !== 12 ||
+      forThem.length > 5000 ||
+      forMe.length > 5000
+    )
+      return err("A carta precisa ir lacrada.");
     const other = await memberOf(data.conversationId, context.userId);
     if (!other) return err("Conversa fechada.");
     if (await isBlocked(context.userId, other)) return err("Não dá pra enviar.");
@@ -1315,7 +1379,8 @@ export const sendMessage = createServerFn({ method: "POST" })
 export const reportContent = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const o = asRecord(input);
-    const reason = typeof o.reason === "string" && REASON_SET.has(o.reason) ? (o.reason as ReportReason) : null;
+    const reason =
+      typeof o.reason === "string" && REASON_SET.has(o.reason) ? (o.reason as ReportReason) : null;
     const targetType = clip(o.targetType, 20);
     return {
       targetType,

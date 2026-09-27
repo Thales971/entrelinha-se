@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { Lamp } from "@/components/entrelinhas/lamp";
 import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
 import { LangSwitch, say, useLang } from "@/lib/entrelinhas/i18n";
-import { Lamp } from "@/components/entrelinhas/lamp";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 
 const BEARER_KEY = "grok-auth.bearer-token";
 
 function mapAuthError(message: string) {
   const m = message.toLowerCase();
-  if (m.includes("invalid email") || m.includes("invalid password") || m.includes("invalid email or password")) {
+  if (
+    m.includes("invalid email") ||
+    m.includes("invalid password") ||
+    m.includes("invalid email or password")
+  ) {
     return "E-mail ou senha não batem.";
   }
   if (m.includes("already") || m.includes("exists")) return "Já existe um caderno com esse e-mail.";
@@ -117,27 +122,64 @@ export function LoginPanel() {
       <div className="mt-4">
         <OpenBook />
       </div>
-      <h1 className="mt-4 text-center font-serif text-[2.4rem] leading-none tracking-tight">entrelinha-se</h1>
-      <p className="mx-auto mt-2 max-w-sm text-center font-serif text-lg leading-snug text-cream/85">{t("tagline")}</p>
+      <h1 className="mt-4 text-center font-serif text-[2.4rem] leading-none tracking-tight">
+        entrelinha-se
+      </h1>
+      <p className="mx-auto mt-2 max-w-sm text-center font-serif text-lg leading-snug text-cream/85">
+        {t("tagline")}
+      </p>
 
       <div className="mt-6 flex gap-2">
-        <button type="button" className={mode === "up" ? "chip chip-on" : "chip"} onClick={() => setMode("up")}>
+        <button
+          type="button"
+          className={mode === "up" ? "chip chip-on" : "chip"}
+          onClick={() => setMode("up")}
+        >
           {t("signUp")}
         </button>
-        <button type="button" className={mode === "in" ? "chip chip-on" : "chip"} onClick={() => setMode("in")}>
+        <button
+          type="button"
+          className={mode === "in" ? "chip chip-on" : "chip"}
+          onClick={() => setMode("in")}
+        >
           {t("signIn")}
         </button>
       </div>
 
       <form onSubmit={submit} className="mt-5 space-y-3">
         {mode === "up" ? (
-          <input className="field" placeholder={t("namePh")} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+          <input
+            className="field"
+            placeholder={t("namePh")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
+          />
         ) : null}
-        <input className="field" placeholder={t("emailPh")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-        <input className="field" placeholder={t("passwordPh")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "up" ? "new-password" : "current-password"} />
+        <input
+          className="field"
+          placeholder={t("emailPh")}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+        />
+        <input
+          className="field"
+          placeholder={t("passwordPh")}
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete={mode === "up" ? "new-password" : "current-password"}
+        />
         {mode === "up" ? (
           <label className="flex items-start gap-3 text-sm text-cream/90">
-            <input type="checkbox" className="mt-1 size-4" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+            <input
+              type="checkbox"
+              className="mt-1 size-4"
+              checked={terms}
+              onChange={(e) => setTerms(e.target.checked)}
+            />
             <span>
               {t("accept")}{" "}
               <button type="button" className="underline" onClick={() => setShowTerms((v) => !v)}>
@@ -159,7 +201,9 @@ export function LoginPanel() {
         </button>
       </form>
 
-      <p className="my-4 text-center text-xs tracking-[0.14em] uppercase text-cream/60">{t("or")}</p>
+      <p className="my-4 text-center text-xs tracking-[0.14em] uppercase text-cream/60">
+        {t("or")}
+      </p>
       <div className="space-y-2">
         {GROK_PROVIDERS.map((provider) => (
           <button
@@ -172,6 +216,16 @@ export function LoginPanel() {
           </button>
         ))}
       </div>
+      <footer className="mt-8 pb-2 text-center text-xs text-cream/60">
+        <Link className="underline underline-offset-2" to="/about">
+          Sobre o entrelinha-se
+        </Link>
+        <span className="mx-2">·</span>
+        <a className="underline underline-offset-2" href="mailto:linhaseentre@gmail.com">
+          linhaseentre@gmail.com
+        </a>
+        <p className="mt-2">© {new Date().getFullYear()} Thales971</p>
+      </footer>
     </div>
   );
 }

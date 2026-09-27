@@ -1,21 +1,22 @@
-import { useEffect, useState } from "react";
-import { BookOpen, Layers, Mail, Plus, UserRound } from "lucide-react";
-import type { AppUser } from "@/lib/auth/use-current-user";
-import { getMe, publishKey } from "@/lib/entrelinhas/api";
-import type { PostKind } from "@/lib/entrelinhas/model";
-import { Boot } from "@/components/entrelinhas/login-panel";
-import { Onboarding } from "@/components/entrelinhas/onboarding";
+import { cx } from "@/components/entrelinhas/book-page";
+import { Compose } from "@/components/entrelinhas/compose";
 import { DeskProvider, type DeskApi } from "@/components/entrelinhas/desk";
 import { Feed } from "@/components/entrelinhas/feed";
 import { Folhear } from "@/components/entrelinhas/folhear";
-import { Compose } from "@/components/entrelinhas/compose";
-import { StoryViewer } from "@/components/entrelinhas/stories";
-import { PostSheet } from "@/components/entrelinhas/post-sheet";
-import { ChatList, ChatThread, ProfileView } from "@/components/entrelinhas/people";
-import { cx } from "@/components/entrelinhas/book-page";
-import { useLang } from "@/lib/entrelinhas/i18n";
 import { Lamp } from "@/components/entrelinhas/lamp";
+import { Boot } from "@/components/entrelinhas/login-panel";
+import { Onboarding } from "@/components/entrelinhas/onboarding";
+import { ChatList, ChatThread, ProfileView } from "@/components/entrelinhas/people";
+import { PostSheet } from "@/components/entrelinhas/post-sheet";
+import { StoryViewer } from "@/components/entrelinhas/stories";
+import type { AppUser } from "@/lib/auth/use-current-user";
+import { getMe, publishKey } from "@/lib/entrelinhas/api";
+import { useLang } from "@/lib/entrelinhas/i18n";
+import type { PostKind } from "@/lib/entrelinhas/model";
 import { localPublicKey, sealOwner } from "@/lib/entrelinhas/seal";
+import { Link } from "@tanstack/react-router";
+import { BookOpen, Info, Layers, Mail, Plus, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type Tab = "inicio" | "folhear" | "conversas" | "eu";
 type Overlay =
@@ -83,10 +84,22 @@ export function Shell({ user }: { user: AppUser }) {
               <Lamp />
             </div>
             <div className="mast-tabs" role="tablist">
-              <button type="button" role="tab" aria-selected={feedMode === "all"} className={feedMode === "all" ? "on" : ""} onClick={() => setFeedMode("all")}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={feedMode === "all"}
+                className={feedMode === "all" ? "on" : ""}
+                onClick={() => setFeedMode("all")}
+              >
                 {t("all")}
               </button>
-              <button type="button" role="tab" aria-selected={feedMode === "following"} className={feedMode === "following" ? "on" : ""} onClick={() => setFeedMode("following")}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={feedMode === "following"}
+                className={feedMode === "following" ? "on" : ""}
+                onClick={() => setFeedMode("following")}
+              >
                 {t("following")}
               </button>
             </div>
@@ -94,9 +107,23 @@ export function Shell({ user }: { user: AppUser }) {
         ) : !overlay ? (
           <header className="shelf-lip">
             <p className="font-serif text-2xl">
-              {tab === "folhear" ? t("navFlip") : tab === "conversas" ? t("navLetters") : t("navMe")}
+              {tab === "folhear"
+                ? t("navFlip")
+                : tab === "conversas"
+                  ? t("navLetters")
+                  : t("navMe")}
             </p>
-            <Lamp />
+            <div className="flex items-center gap-2">
+              <Link
+                to="/about"
+                className="lamp-btn on-paper"
+                aria-label="Sobre o entrelinha-se"
+                title="Sobre o entrelinha-se"
+              >
+                <Info className="size-5" />
+              </Link>
+              <Lamp />
+            </div>
           </header>
         ) : null}
         <div className="min-h-0 flex-1">
@@ -106,22 +133,57 @@ export function Shell({ user }: { user: AppUser }) {
           {tab === "eu" ? <ProfileView userId={user.id} /> : null}
         </div>
         <nav className="nav-bar grid grid-cols-5 place-items-center px-2 pt-2">
-          <button type="button" className={cx("nav-btn", tab === "inicio" && "on")} onClick={() => { setOverlay(null); setTab("inicio"); }}>
+          <button
+            type="button"
+            className={cx("nav-btn", tab === "inicio" && "on")}
+            onClick={() => {
+              setOverlay(null);
+              setTab("inicio");
+            }}
+          >
             <BookOpen className="size-5" />
             {t("navHome")}
           </button>
-          <button type="button" className={cx("nav-btn", tab === "folhear" && "on")} onClick={() => { setOverlay(null); setTab("folhear"); }}>
+          <button
+            type="button"
+            className={cx("nav-btn", tab === "folhear" && "on")}
+            onClick={() => {
+              setOverlay(null);
+              setTab("folhear");
+            }}
+          >
             <Layers className="size-5" />
             {t("navFlip")}
           </button>
-          <button type="button" className="nav-btn" onClick={() => setOverlay({ type: "compose", mode: "post" })} aria-label={t("newPage")}>
-            <span className="seal-fab"><Plus className="size-5" /></span>
+          <button
+            type="button"
+            className="nav-btn"
+            onClick={() => setOverlay({ type: "compose", mode: "post" })}
+            aria-label={t("newPage")}
+          >
+            <span className="seal-fab">
+              <Plus className="size-5" />
+            </span>
           </button>
-          <button type="button" className={cx("nav-btn", tab === "conversas" && "on")} onClick={() => { setOverlay(null); setTab("conversas"); }}>
+          <button
+            type="button"
+            className={cx("nav-btn", tab === "conversas" && "on")}
+            onClick={() => {
+              setOverlay(null);
+              setTab("conversas");
+            }}
+          >
             <Mail className="size-5" />
             {t("navLetters")}
           </button>
-          <button type="button" className={cx("nav-btn", tab === "eu" && "on")} onClick={() => { setOverlay(null); setTab("eu"); }}>
+          <button
+            type="button"
+            className={cx("nav-btn", tab === "eu" && "on")}
+            onClick={() => {
+              setOverlay(null);
+              setTab("eu");
+            }}
+          >
             <UserRound className="size-5" />
             {t("navMe")}
           </button>
@@ -138,10 +200,25 @@ export function Shell({ user }: { user: AppUser }) {
             }}
           />
         ) : null}
-        {overlay?.type === "post" ? <PostSheet id={overlay.id} onClose={() => setOverlay(null)} /> : null}
-        {overlay?.type === "story" ? <StoryViewer userId={overlay.userId} onClose={() => { setOverlay(null); setTick((n) => n + 1); }} /> : null}
+        {overlay?.type === "post" ? (
+          <PostSheet id={overlay.id} onClose={() => setOverlay(null)} />
+        ) : null}
+        {overlay?.type === "story" ? (
+          <StoryViewer
+            userId={overlay.userId}
+            onClose={() => {
+              setOverlay(null);
+              setTick((n) => n + 1);
+            }}
+          />
+        ) : null}
         {overlay?.type === "chat" ? (
-          <ChatThread conversationId={overlay.conversationId} title={overlay.title} sealLost={sealLost} onClose={() => setOverlay(null)} />
+          <ChatThread
+            conversationId={overlay.conversationId}
+            title={overlay.title}
+            sealLost={sealLost}
+            onClose={() => setOverlay(null)}
+          />
         ) : null}
         {overlay?.type === "user" ? (
           <div className="sheet sheet-wood">

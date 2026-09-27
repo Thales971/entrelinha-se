@@ -1,4 +1,4 @@
-const siteUrl = process.env.EXPO_PUBLIC_SITE_URL || "";
+const siteUrl = process.env.EXPO_PUBLIC_SITE_URL || "https://entrelinha-se.vercel.app/";
 
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
@@ -31,6 +31,9 @@ module.exports = {
     },
     extra: {
       siteUrl,
+      eas: {
+        projectId: "97997ee6-e7d3-4b03-a182-e0c538c4cbb1",
+      },
     },
     plugins: ["expo-status-bar"],
   },

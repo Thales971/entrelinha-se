@@ -43,6 +43,18 @@ Abre em `http://localhost:8080`.
 
 O banco local sobe sozinho. Em produção o app usa Postgres pela variável `DATABASE_URL`, que fica fora do git.
 
+## Publicar no Vercel
+
+Na raiz do repositório, importe o projeto no Vercel usando o repositório `Thales971/entrelinha-se`. Deixe `Root Directory` como `.` (não use `mobile`), use `npm run build` como comando de build e mantenha o comando de instalação definido em `vercel.json`.
+
+Antes do primeiro deploy, adicione nas Environment Variables do Vercel, para `Production` e `Preview` conforme necessário:
+
+- `DATABASE_URL`: conexão do Postgres de produção
+- `BETTER_AUTH_SECRET`: um segredo aleatório longo
+- `BETTER_AUTH_URL`: a URL pública do projeto, por exemplo `https://entrelinha-se.vercel.app`
+
+Depois de publicar, copie a URL real gerada pelo Vercel e use-a no build do app Expo, conforme a seção abaixo.
+
 ## App de celular, pelo Expo
 
 A pasta `mobile` é o app que o EAS empacota. Ele abre o mesmo caderno, pra não reescrever o livro inteiro antes da loja. A Play Store fica pra quando o app estiver redondo. O que dá pra gerar agora é um APK de teste.
@@ -60,23 +72,27 @@ npx eas init
 O `eas init` liga o projeto na sua conta da Expo e grava o id. Depois:
 
 ```bash
-EXPO_PUBLIC_SITE_URL="https://seu-endereco" npx eas build --platform android --profile preview
+$env:EXPO_PUBLIC_SITE_URL = "https://seu-endereco.com"
+npx eas build --platform android --profile preview
 ```
+
+No PowerShell, troque `https://seu-endereco.com` pelo endereço público real do site. No Prompt de Comando, use `set EXPO_PUBLIC_SITE_URL=https://seu-endereco.com` antes do comando de build.
 
 O perfil `preview` gera um APK pra instalar e testar. O perfil `production` gera o pacote da loja (AAB), e esse fica pra mais tarde:
 
 ```bash
-EXPO_PUBLIC_SITE_URL="https://seu-endereco" npm run build:loja
+$env:EXPO_PUBLIC_SITE_URL = "https://seu-endereco.com"
+npm run build:loja
 ```
 
 O pacote Android é `app.entrelinha.caderno`. O ícone é o livro aberto no fundo creme.
 
 ## O que tem aqui
 
-| Parte | Onde |
-|---|---|
-| Site | raiz do repositório |
-| App Expo | `mobile` |
-| Banco | `migrations` |
-| Filtro de texto | `src/lib/entrelinhas/guard.ts` |
-| Lacre das cartas | `src/lib/entrelinhas/seal.ts` |
+| Parte            | Onde                           |
+| ---------------- | ------------------------------ |
+| Site             | raiz do repositório            |
+| App Expo         | `mobile`                       |
+| Banco            | `migrations`                   |
+| Filtro de texto  | `src/lib/entrelinhas/guard.ts` |
+| Lacre das cartas | `src/lib/entrelinhas/seal.ts`  |
